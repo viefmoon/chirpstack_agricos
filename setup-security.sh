@@ -40,21 +40,28 @@ PUBLIC_IP="143.244.144.51"
 
 log "Iniciando configuración de seguridad para ChirpStack..."
 
-# Preguntar por el dominio
-echo ""
-echo -e "${BLUE}¿Tienes un dominio configurado para este servidor?${NC}"
-echo "Si tienes un dominio (ej: chirpstack.ejemplo.com), podremos configurar HTTPS"
-echo "Si no tienes dominio, solo configuraremos seguridad básica"
-echo ""
-read -p "Ingresa tu dominio (o presiona Enter para solo IP): " DOMAIN
-
-if [[ -z "$DOMAIN" ]]; then
-    DOMAIN="$PUBLIC_IP"
-    HTTPS_ENABLED=false
-    info "Usando IP pública: $PUBLIC_IP"
+# Configurar dominio automáticamente si se pasa como variable de entorno
+if [[ -n "$AUTO_DOMAIN" ]]; then
+    DOMAIN="$AUTO_DOMAIN"
+    HTTPS_ENABLED="$AUTO_HTTPS"
+    info "Usando configuración automática: $DOMAIN"
 else
-    HTTPS_ENABLED=true
-    info "Usando dominio: $DOMAIN"
+    # Preguntar por el dominio solo si no se configuró automáticamente
+    echo ""
+    echo -e "${BLUE}¿Tienes un dominio configurado para este servidor?${NC}"
+    echo "Si tienes un dominio (ej: network.sense.lat), podremos configurar HTTPS"
+    echo "Si no tienes dominio, solo configuraremos seguridad básica"
+    echo ""
+    read -p "Ingresa tu dominio (o presiona Enter para solo IP): " DOMAIN
+
+    if [[ -z "$DOMAIN" ]]; then
+        DOMAIN="$PUBLIC_IP"
+        HTTPS_ENABLED=false
+        info "Usando IP pública: $PUBLIC_IP"
+    else
+        HTTPS_ENABLED=true
+        info "Usando dominio: $DOMAIN"
+    fi
 fi
 
 # Configurar fail2ban para protección contra ataques de fuerza bruta

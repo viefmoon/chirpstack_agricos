@@ -10,11 +10,17 @@ Esta es una guía completa para deployar ChirpStack v4 en un droplet de DigitalO
 # 1. Conectar al servidor
 ssh root@143.244.144.51
 
-# 2. Descargar y ejecutar
+# 2. Descargar y ejecutar (100% automático)
 git clone https://github.com/viefmoon/chirpstack_agricos.git
 cd chirpstack_agricos
 chmod +x *.sh
 sudo ./quick-install.sh
+
+# ¡Eso es todo! El script hace TODO automáticamente:
+# - Instala dependencias
+# - Configura ChirpStack v4 
+# - Configura HTTPS para network.sense.lat
+# - Configura firewall y seguridad
 
 # 3. CAMBIAR CONTRASEÑA (CRÍTICO):
 #    - Ir a: http://143.244.144.51:8080

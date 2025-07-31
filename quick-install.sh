@@ -63,52 +63,27 @@ echo ""
 echo -e "${BLUE}Configuración inicial:${NC}"
 echo ""
 
-# Preguntar por dominio
-read -p "¿Tienes un dominio para este servidor? (ej: chirpstack.ejemplo.com) [Enter para usar IP]: " DOMAIN
-if [[ -z "$DOMAIN" ]]; then
-    DOMAIN="$PUBLIC_IP"
-    HTTPS_ENABLED=false
-    info "Usando IP pública: $PUBLIC_IP"
-else
-    HTTPS_ENABLED=true
-    info "Usando dominio: $DOMAIN"
-fi
+# Configurar dominio automáticamente
+DOMAIN="network.sense.lat"
+HTTPS_ENABLED=true
+info "Usando dominio configurado: $DOMAIN"
+log "Si necesitas cambiar el dominio, edita este script"
 
-# Preguntar por región LoRaWAN
+# Configurar región LoRaWAN automáticamente
+LORAWAN_REGION="US915"
+info "Región LoRaWAN configurada: $LORAWAN_REGION"
+log "Para cambiar región, edita este script o el archivo .env después"
+
+# Mostrar configuración automática
 echo ""
-echo -e "${BLUE}Regiones LoRaWAN disponibles:${NC}"
-echo "1) US915 (Estados Unidos, Canadá, México)"
-echo "2) EU868 (Europa)"
-echo "3) AS923 (Asia-Pacífico)"
-echo "4) AU915 (Australia)"
-echo "5) CN470 (China)"
-echo ""
-read -p "Selecciona tu región [1-5, Enter para US915]: " REGION_CHOICE
-
-case $REGION_CHOICE in
-    2) LORAWAN_REGION="EU868" ;;
-    3) LORAWAN_REGION="AS923" ;;
-    4) LORAWAN_REGION="AU915" ;;
-    5) LORAWAN_REGION="CN470" ;;
-    *) LORAWAN_REGION="US915" ;;
-esac
-
-info "Región seleccionada: $LORAWAN_REGION"
-
-# Confirmar instalación
-echo ""
-echo -e "${YELLOW}Resumen de la instalación:${NC}"
+echo -e "${YELLOW}Configuración automática:${NC}"
 echo "- Servidor: $HOSTNAME ($PUBLIC_IP)"
 echo "- Dominio: $DOMAIN"
 echo "- Región LoRaWAN: $LORAWAN_REGION"
-echo "- HTTPS: $(if [[ "$HTTPS_ENABLED" == true ]]; then echo "Habilitado"; else echo "Deshabilitado"; fi)"
+echo "- HTTPS: Habilitado"
 echo ""
-read -p "¿Continuar con la instalación? [y/N]: " CONFIRM
-
-if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
-    info "Instalación cancelada por el usuario"
-    exit 0
-fi
+log "Instalación iniciada automáticamente..."
+sleep 2
 
 # Crear directorio de trabajo
 WORK_DIR="/opt/chirpstack-setup"
@@ -161,12 +136,10 @@ fi
 log "PASO 3/3: Configurando seguridad..."
 echo ""
 
-# Crear archivo de respuestas automáticas para el script de seguridad
-if [[ "$HTTPS_ENABLED" == true ]]; then
-    echo "$DOMAIN" | ./setup-security.sh
-else
-    echo "" | ./setup-security.sh
-fi
+# Configurar seguridad automáticamente sin preguntas
+export AUTO_DOMAIN="$DOMAIN"
+export AUTO_HTTPS="$HTTPS_ENABLED"
+./setup-security.sh
 
 if [[ $? -ne 0 ]]; then
     warning "Hubo algunos problemas con la configuración de seguridad, pero ChirpStack debería funcionar"
