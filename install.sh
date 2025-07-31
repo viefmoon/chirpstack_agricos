@@ -1,9 +1,8 @@
 #!/bin/bash
 
-# ChirpStack DigitalOcean - Instalación Rápida
-# Autor: Guía ChirpStack Deployment
-# Versión: 1.0
-# Este script descarga e instala ChirpStack completamente automático
+# ChirpStack v4 + Supabase - Instalador Principal
+# Repositorio: https://github.com/viefmoon/chirpstack_agricos
+# Versión: 2.0
 
 set -e  # Salir si algún comando falla
 
@@ -37,19 +36,23 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
+# Obtener directorio actual del script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPTS_DIR="$SCRIPT_DIR/scripts"
+
 # Banner
 echo -e "${GREEN}"
 cat << 'EOF'
  ┌─────────────────────────────────────────────────────────────┐
  │                                                             │
- │       ChirpStack v4 + Ubuntu 24.04 - Instalador           │
+ │       ChirpStack v4 + Ubuntu 24.04 - Instalador v2.0      │
  │                    Instalación Automática                  │
  │                                                             │
  └─────────────────────────────────────────────────────────────┘
 EOF
 echo -e "${NC}"
 
-log "Iniciando instalación automática de ChirpStack..."
+log "Iniciando instalación automática de ChirpStack v4..."
 
 # Información del servidor
 PUBLIC_IP="143.244.144.51"
@@ -57,24 +60,37 @@ HOSTNAME=$(hostname)
 
 info "Servidor: $HOSTNAME"
 info "IP Pública: $PUBLIC_IP"
+info "Directorio de scripts: $SCRIPTS_DIR"
 
-# Preguntar configuración básica
-echo ""
-echo -e "${BLUE}Configuración inicial:${NC}"
-echo ""
+# Verificar que los scripts estén disponibles
+if [[ ! -f "$SCRIPTS_DIR/install-dependencies.sh" ]] || [[ ! -f "$SCRIPTS_DIR/configure-chirpstack.sh" ]] || [[ ! -f "$SCRIPTS_DIR/setup-security.sh" ]]; then
+    error "Scripts no encontrados en $SCRIPTS_DIR"
+    error "Estructura esperada:"
+    error "├── install.sh (este archivo)"
+    error "├── scripts/"
+    error "│   ├── install-dependencies.sh"
+    error "│   ├── configure-chirpstack.sh"
+    error "│   ├── setup-security.sh"
+    error "│   └── setup-supabase-service.sh"
+    error "└── services/"
+    error "    └── supabase/"
+    exit 1
+fi
 
-# Configurar dominio automáticamente
+log "Scripts encontrados correctamente"
+
+# Configuración automática
 DOMAIN="network.sense.lat"
 HTTPS_ENABLED=true
-info "Usando dominio configurado: $DOMAIN"
-log "Si necesitas cambiar el dominio, edita este script"
-
-# Configurar región LoRaWAN automáticamente
 LORAWAN_REGION="us915_0"
+
+info "Usando dominio configurado: $DOMAIN"
 info "Región LoRaWAN configurada: $LORAWAN_REGION (US915 canales 0-7)"
 log "Para cambiar región, edita este script antes de ejecutar"
 
-# Mostrar configuración automática
+# Hacer scripts ejecutables
+chmod +x "$SCRIPTS_DIR"/*.sh
+
 echo ""
 echo -e "${YELLOW}Configuración automática:${NC}"
 echo "- Servidor: $HOSTNAME ($PUBLIC_IP)"
@@ -85,33 +101,10 @@ echo ""
 log "Instalación iniciada automáticamente..."
 sleep 2
 
-# Obtener directorio actual del script
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-log "Ejecutando desde: $SCRIPT_DIR"
-
-# Verificar que los scripts estén disponibles en el directorio actual
-if [[ ! -f "$SCRIPT_DIR/install-dependencies.sh" ]] || [[ ! -f "$SCRIPT_DIR/configure-chirpstack.sh" ]] || [[ ! -f "$SCRIPT_DIR/setup-security.sh" ]]; then
-    error "Scripts no encontrados en $SCRIPT_DIR"
-    error "Asegúrate de ejecutar desde el directorio del repositorio:"
-    error "git clone https://github.com/viefmoon/chirpstack_agricos.git"
-    error "cd chirpstack_agricos"
-    error "chmod +x *.sh"
-    error "sudo ./quick-install.sh"
-    exit 1
-fi
-
-log "Scripts encontrados correctamente"
-
-# Hacer scripts ejecutables
-chmod +x "$SCRIPT_DIR"/*.sh
-
-# Trabajar desde el directorio del script
-cd "$SCRIPT_DIR"
-
 # PASO 1: Instalar dependencias
-log "PASO 1/3: Instalando dependencias del sistema..."
+log "PASO 1/4: Instalando dependencias del sistema..."
 echo ""
-./install-dependencies.sh
+"$SCRIPTS_DIR/install-dependencies.sh"
 
 if [[ $? -ne 0 ]]; then
     error "Error en la instalación de dependencias"
@@ -119,16 +112,16 @@ if [[ $? -ne 0 ]]; then
 fi
 
 # PASO 2: Configurar ChirpStack
-log "PASO 2/3: Configurando ChirpStack..."
+log "PASO 2/4: Configurando ChirpStack..."
 echo ""
 
 # Personalizar configuración antes de ejecutar
-if [[ -f "configure-chirpstack.sh" ]]; then
+if [[ -f "$SCRIPTS_DIR/configure-chirpstack.sh" ]]; then
     # Modificar región en el script si es necesario
-    sed -i "s/CHIRPSTACK_REGION=\"us915_0\"/CHIRPSTACK_REGION=\"$LORAWAN_REGION\"/" configure-chirpstack.sh
+    sed -i "s/CHIRPSTACK_REGION=\"us915_0\"/CHIRPSTACK_REGION=\"$LORAWAN_REGION\"/" "$SCRIPTS_DIR/configure-chirpstack.sh"
 fi
 
-./configure-chirpstack.sh
+"$SCRIPTS_DIR/configure-chirpstack.sh"
 
 if [[ $? -ne 0 ]]; then
     error "Error en la configuración de ChirpStack"
@@ -136,16 +129,32 @@ if [[ $? -ne 0 ]]; then
 fi
 
 # PASO 3: Configurar seguridad
-log "PASO 3/3: Configurando seguridad..."
+log "PASO 3/4: Configurando seguridad..."
 echo ""
 
 # Configurar seguridad automáticamente sin preguntas
 export AUTO_DOMAIN="$DOMAIN"
 export AUTO_HTTPS="$HTTPS_ENABLED"
-./setup-security.sh
+"$SCRIPTS_DIR/setup-security.sh"
 
 if [[ $? -ne 0 ]]; then
     warning "Hubo algunos problemas con la configuración de seguridad, pero ChirpStack debería funcionar"
+fi
+
+# PASO 4: Configurar servicio Supabase (opcional)
+log "PASO 4/4: Configurando servicio ChirpStack-Supabase..."
+echo ""
+
+if [[ -f "$SCRIPTS_DIR/setup-supabase-service.sh" ]]; then
+    "$SCRIPTS_DIR/setup-supabase-service.sh"
+    
+    if [[ $? -eq 0 ]]; then
+        info "✓ Servicio ChirpStack-Supabase configurado correctamente"
+    else
+        warning "⚠ Hubo problemas configurando el servicio Supabase, pero ChirpStack funciona sin él"
+    fi
+else
+    warning "Script setup-supabase-service.sh no encontrado, omitiendo configuración del servicio"
 fi
 
 # Esperar a que los servicios estén listos
@@ -158,7 +167,7 @@ ChirpStack Installation Summary
 ===============================
 
 Installation Date: $(date)
-Installation Method: Quick Install Script
+Installation Method: ChirpStack v2.0 Installer
 Server: $HOSTNAME
 Public IP: $PUBLIC_IP
 Domain: $DOMAIN
@@ -174,7 +183,7 @@ IMPORTANT: Change the default password immediately!
 
 Installation Location: /opt/chirpstack-docker
 Configuration Files: /opt/chirpstack-docker/.env
-Backup Scripts: /opt/chirpstack-setup/
+Backup Scripts: $SCRIPTS_DIR/
 
 Useful Commands:
 - Start services: /opt/chirpstack-docker/start-chirpstack.sh
@@ -182,7 +191,7 @@ Useful Commands:
 - View logs: /opt/chirpstack-docker/logs-chirpstack.sh
 - Check status: /opt/chirpstack-docker/status-chirpstack.sh
 - Security monitor: /opt/security-monitor.sh
-- Create backup: /opt/chirpstack-setup/backup-chirpstack.sh
+- Create backup: $SCRIPTS_DIR/backup-chirpstack.sh
 
 Services Status:
 - ChirpStack Web Interface: Port 8080
@@ -191,12 +200,19 @@ Services Status:
 - PostgreSQL: Internal Docker network
 - Redis: Internal Docker network
 
+ChirpStack-Supabase Service (Optional):
+- Configure: /opt/chirpstack-supabase-service/configure-env.sh
+- Start: systemctl start chirpstack-supabase
+- Status: systemctl status chirpstack-supabase
+- Logs: journalctl -u chirpstack-supabase -f
+
 Next Steps:
 1. Access the web interface
 2. Change default admin password
-3. Configure your first gateway
-4. Set up your first application
-5. Register your first device
+3. Configure Supabase service (optional)
+4. Configure your first gateway
+5. Set up your first application
+6. Register your first device
 
 Troubleshooting:
 - If web interface is not accessible, check: systemctl status nginx
@@ -233,7 +249,7 @@ echo ""
 echo -e "${BLUE}🔧 Comandos Útiles:${NC}"
 echo "   • Ver logs: ${YELLOW}/opt/chirpstack-docker/logs-chirpstack.sh${NC}"
 echo "   • Estado: ${YELLOW}/opt/chirpstack-docker/status-chirpstack.sh${NC}"
-echo "   • Backup: ${YELLOW}/opt/chirpstack-setup/backup-chirpstack.sh${NC}"
+echo "   • Backup: ${YELLOW}$SCRIPTS_DIR/backup-chirpstack.sh${NC}"
 echo ""
 echo -e "${BLUE}📄 Resumen completo guardado en:${NC} /opt/INSTALLATION_SUMMARY.txt"
 echo ""
@@ -259,9 +275,16 @@ echo "   • DigitalOcean → Networking → Domains → sense.lat"
 echo "   • Add Record: Type A, Hostname 'network', IP 143.244.144.51"
 echo ""
 echo -e "${YELLOW}📋 Próximos pasos (después de lo anterior):${NC}"
-echo "3. Configurar tu primer gateway"
-echo "4. Crear tu primera aplicación" 
-echo "5. Programar backups regulares"
+echo "3. Configurar Supabase (OPCIONAL):"
+echo "   sudo /opt/chirpstack-supabase-service/configure-env.sh"
+echo "4. Configurar tu primer gateway"
+echo "5. Crear tu primera aplicación" 
+echo "6. Programar backups regulares"
+echo ""
+echo -e "${BLUE}🔗 Servicio ChirpStack-Supabase:${NC}"
+echo "   • Configurar: /opt/chirpstack-supabase-service/configure-env.sh"
+echo "   • Iniciar: systemctl start chirpstack-supabase"
+echo "   • Ver logs: journalctl -u chirpstack-supabase -f"
 echo ""
 echo -e "${RED}⚠️  NO uses ChirpStack en producción con contraseña 'admin'${NC}"
 echo ""

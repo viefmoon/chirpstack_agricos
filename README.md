@@ -1,6 +1,6 @@
-# ChirpStack v4 en DigitalOcean - Guía de Despliegue Automático
+# ChirpStack v4 en DigitalOcean - Guía de Despliegue Automático v2.0
 
-Esta es una guía completa para deployar ChirpStack v4 en un droplet de DigitalOcean desde cero, incluyendo scripts de automatización para simplificar el proceso.
+Esta es una guía completa para deployar ChirpStack v4 en un droplet de DigitalOcean desde cero, incluyendo scripts de automatización y servicio opcional de integración con Supabase.
 
 > **ChirpStack v4 + Ubuntu 24.04 LTS:** Combinación optimizada que unifica el Network Server y Application Server en un solo componente, aprovechando las últimas mejoras de seguridad y rendimiento de Ubuntu 24.04.
 
@@ -13,14 +13,15 @@ ssh root@143.244.144.51
 # 2. Descargar y ejecutar (100% automático)
 git clone https://github.com/viefmoon/chirpstack_agricos.git
 cd chirpstack_agricos
-chmod +x *.sh
-sudo ./quick-install.sh
+chmod +x install.sh
+sudo ./install.sh
 
 # ¡Eso es todo! El script hace TODO automáticamente:
-# - Instala dependencias
-# - Configura ChirpStack v4 
+# - Instala dependencias (Docker, Node.js, Nginx)
+# - Configura ChirpStack v4 con regiones oficiales
 # - Configura HTTPS para network.sense.lat
 # - Configura firewall y seguridad
+# - Instala servicio ChirpStack-Supabase (opcional)
 
 # 3. CAMBIAR CONTRASEÑA (CRÍTICO):
 #    - Ir a: http://143.244.144.51:8080
@@ -31,14 +32,26 @@ sudo ./quick-install.sh
 # 5. Acceder: https://network.sense.lat
 ```
 
-## 📁 Archivos Incluidos
+## 📁 Estructura del Repositorio
 
-- **`chirpstack-digitalocean-deployment-guide.md`** - Guía detallada paso a paso
-- **`install-dependencies.sh`** - Script de instalación automática de dependencias
-- **`configure-chirpstack.sh`** - Script de configuración automática de ChirpStack
-- **`setup-security.sh`** - Script de configuración de seguridad y HTTPS
-- **`backup-chirpstack.sh`** - Script completo de backup y restauración
-- **`quick-install.sh`** - Instalación automática completa
+```
+chirpstack_agricos/
+├── install.sh                          # 🚀 Instalador principal
+├── README.md                           # 📖 Esta documentación
+├── scripts/                            # 📜 Scripts de instalación
+│   ├── install-dependencies.sh         #   • Dependencias del sistema
+│   ├── configure-chirpstack.sh         #   • Configuración de ChirpStack
+│   ├── setup-security.sh               #   • Configuración de seguridad
+│   ├── setup-supabase-service.sh       #   • Servicio ChirpStack-Supabase
+│   └── backup-chirpstack.sh            #   • Backup y restauración
+├── services/                           # 🔗 Servicios adicionales
+│   └── supabase/                       #   • Integración con Supabase
+│       ├── chirpstack-supabase-service.js  #   • Servicio Node.js
+│       ├── package.json                #   • Dependencias npm
+│       └── .env.example                #   • Plantilla de configuración
+└── docs/                               # 📚 Documentación
+    └── chirpstack-digitalocean-deployment-guide.md  # Guía detallada
+```
 
 ## 🚀 Instalación Rápida (Automática)
 
@@ -54,21 +67,18 @@ sudo ./quick-install.sh
    ssh root@143.244.144.51
    ```
 
-### Paso 2: Descargar Scripts
+### Paso 2: Descargar e Instalar
 
 ```bash
-# Crear directorio de trabajo
-mkdir -p /opt/chirpstack-setup
-cd /opt/chirpstack-setup
+# Clonar repositorio
+git clone https://github.com/viefmoon/chirpstack_agricos.git
+cd chirpstack_agricos
 
-# Clonar repositorio con todos los scripts
-git clone https://github.com/viefmoon/chirpstack_agricos.git .
+# Hacer script principal ejecutable
+chmod +x install.sh
 
-# Hacer scripts ejecutables
-chmod +x *.sh
-
-# Verificar archivos descargados
-ls -la *.sh
+# Verificar estructura
+tree -L 2
 ```
 
 ### Paso 3: Ejecutar Instalación
@@ -76,19 +86,22 @@ ls -la *.sh
 #### Opción A: Instalación Automática (Recomendado)
 ```bash
 # Instalación completa en un solo comando
-sudo ./quick-install.sh
+sudo ./install.sh
 ```
 
 #### Opción B: Instalación Manual (Paso a Paso)
 ```bash
 # 1. Instalar dependencias (Docker, Nginx, etc.)
-sudo ./install-dependencies.sh
+sudo ./scripts/install-dependencies.sh
 
 # 2. Configurar ChirpStack
-sudo ./configure-chirpstack.sh
+sudo ./scripts/configure-chirpstack.sh
 
 # 3. Configurar seguridad (opcional pero recomendado)
-sudo ./setup-security.sh
+sudo ./scripts/setup-security.sh
+
+# 4. Configurar servicio Supabase (opcional)
+sudo ./scripts/setup-supabase-service.sh
 ```
 
 ## 🔧 Instalación Manual
@@ -97,7 +110,23 @@ Si prefieres seguir el proceso paso a paso, consulta la guía completa en `chirp
 
 ## 📋 Descripción de Scripts
 
-### 1. install-dependencies.sh
+### Instalador Principal
+
+#### install.sh
+**Qué hace:**
+- Orchestador principal que ejecuta todos los scripts en orden
+- Verifica estructura del repositorio
+- Maneja configuración automática de región y dominio
+- Genera resumen completo de instalación
+
+**Uso:**
+```bash
+sudo ./install.sh
+```
+
+### Scripts de Instalación
+
+#### 1. scripts/install-dependencies.sh
 
 **Qué hace:**
 - Actualiza el sistema Ubuntu
@@ -109,10 +138,10 @@ Si prefieres seguir el proceso paso a paso, consulta la guía completa en `chirp
 
 **Uso:**
 ```bash
-sudo ./install-dependencies.sh
+sudo ./scripts/install-dependencies.sh
 ```
 
-### 2. configure-chirpstack.sh
+#### 2. scripts/configure-chirpstack.sh
 
 **Qué hace:**
 - Clona el repositorio Docker de ChirpStack
@@ -125,14 +154,14 @@ sudo ./install-dependencies.sh
 
 **Uso:**
 ```bash
-sudo ./configure-chirpstack.sh
+sudo ./scripts/configure-chirpstack.sh
 ```
 
 **Resultado:**
 - ChirpStack accesible en `http://143.244.144.51:8080`
 - Usuario: `admin` / Contraseña: `admin`
 
-### 3. setup-security.sh
+#### 3. scripts/setup-security.sh
 
 **Qué hace:**
 - Instala y configura fail2ban
@@ -144,12 +173,26 @@ sudo ./configure-chirpstack.sh
 
 **Uso:**
 ```bash
-sudo ./setup-security.sh
+sudo ./scripts/setup-security.sh
 ```
 
 Durante la ejecución te preguntará si tienes un dominio configurado para habilitar HTTPS.
 
-### 4. backup-chirpstack.sh
+#### 4. scripts/setup-supabase-service.sh
+
+**Qué hace:**
+- Instala Node.js LTS automáticamente
+- Crea usuario del sistema para el servicio
+- Configura servicio systemd con reinicio automático
+- Crea scripts de utilidad para manejo del servicio
+- Configura permisos de seguridad
+
+**Uso:**
+```bash
+sudo ./scripts/setup-supabase-service.sh
+```
+
+#### 5. scripts/backup-chirpstack.sh
 
 **Qué hace:**
 - Crea backups completos de ChirpStack
@@ -159,34 +202,120 @@ Durante la ejecución te preguntará si tienes un dominio configurado para habil
 
 **Uso:**
 ```bash
-# Si no tienes los scripts, descargar:
-# git clone https://github.com/viefmoon/chirpstack_agricos.git
-# cd chirpstack_agricos
-
 # Backup completo
-sudo ./backup-chirpstack.sh
+sudo ./scripts/backup-chirpstack.sh
 
 # Solo base de datos
-sudo ./backup-chirpstack.sh --database
+sudo ./scripts/backup-chirpstack.sh --database
 
 # Solo configuraciones
-sudo ./backup-chirpstack.sh --config
+sudo ./scripts/backup-chirpstack.sh --config
 
 # Listar backups
-sudo ./backup-chirpstack.sh --list
+sudo ./scripts/backup-chirpstack.sh --list
 
 # Restaurar backup
-sudo ./backup-chirpstack.sh --restore backup_file.tar.gz
+sudo ./scripts/backup-chirpstack.sh --restore backup_file.tar.gz
 
 # Limpiar backups antiguos
-sudo ./backup-chirpstack.sh --cleanup
+sudo ./scripts/backup-chirpstack.sh --cleanup
 ```
+
+### Servicios Adicionales
+
+#### services/supabase/
+**Contiene:**
+- `chirpstack-supabase-service.js` - Servicio Node.js para insertar datos en Supabase
+- `package.json` - Dependencias npm (mqtt, @supabase/supabase-js, dotenv)  
+- `.env.example` - Plantilla de configuración de entorno
 
 ## 🔍 Acceso Post-Instalación
 
 1. **Abrir navegador:** `http://143.244.144.51:8080` (o `https://network.sense.lat`)
 2. **Login:** `admin` / `admin`  
 3. **¡IMPORTANTE!** Cambiar contraseña inmediatamente
+
+## 🔗 Servicio ChirpStack-Supabase (Opcional)
+
+El servicio permite almacenar automáticamente las mediciones de sensores LoRaWAN en Supabase.
+
+### Configuración Rápida
+
+```bash
+# 1. Configurar credenciales de Supabase (interactivo)
+sudo /opt/chirpstack-supabase-service/configure-env.sh
+
+# 2. Iniciar el servicio
+sudo systemctl start chirpstack-supabase
+
+# 3. Verificar que esté funcionando
+sudo systemctl status chirpstack-supabase
+```
+
+### Comandos del Servicio
+
+```bash
+# Iniciar servicio
+sudo systemctl start chirpstack-supabase
+
+# Detener servicio  
+sudo systemctl stop chirpstack-supabase
+
+# Reiniciar servicio
+sudo systemctl restart chirpstack-supabase
+
+# Ver estado
+sudo systemctl status chirpstack-supabase
+
+# Ver logs en tiempo real
+sudo journalctl -u chirpstack-supabase -f
+```
+
+### Configuración Manual
+
+Editar archivo de configuración:
+```bash
+sudo nano /opt/chirpstack-supabase-service/.env
+```
+
+Variables requeridas:
+```env
+SUPABASE_URL=https://tu-proyecto.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=tu-service-role-key-aqui
+MQTT_HOST=localhost
+MQTT_PORT=1883
+MQTT_TOPIC=application/#
+```
+
+### Estructura de Base de Datos
+
+El servicio crea automáticamente registros en estas tablas:
+
+- **`stations`** - Estaciones de medición
+- **`devices`** - Dispositivos LoRaWAN  
+- **`sensors`** - Sensores individuales
+- **`sensor_types`** - Tipos de sensores (TEMP, HUM, PH, etc.)
+- **`readings`** - Lecturas de sensores
+- **`voltage_readings`** - Lecturas de voltaje de dispositivos
+
+### Sensores Soportados
+
+El servicio reconoce automáticamente estos sensores:
+
+#### Sensores Simples:
+- **N100K/N10K** - Temperatura
+- **HDS10** - Humedad
+- **RTD/DS18B20** - Temperatura  
+- **PH** - pH
+- **COND** - Conductividad
+- **SOILH** - Humedad del suelo
+- **VEML7700** - Luminosidad
+
+#### Sensores Múltiples:
+- **SHT30/SHT40** - Temperatura + Humedad
+- **BME280/BME680** - Temperatura + Humedad + Presión (+ Gas)
+- **CO2** - CO2 + Temperatura + Humedad
+- **ENV4** - Humedad + Temperatura + Presión + Luminosidad
 
 ## 📊 Monitoreo y Mantenimiento
 
@@ -233,8 +362,8 @@ sudo ./backup-chirpstack.sh --cleanup
 
 #### Cambiar Región Antes de Instalar:
 ```bash
-# Editar quick-install.sh antes de ejecutar
-nano quick-install.sh
+# Editar install.sh antes de ejecutar
+nano install.sh
 
 # Cambiar línea:
 LORAWAN_REGION="eu868"  # Cambiar por tu región

@@ -1,0 +1,31 @@
+{
+  "name": "chirpstack-supabase-service",
+  "version": "1.0.0",
+  "description": "Servicio para insertar mediciones de ChirpStack en Supabase",
+  "main": "chirpstack-supabase-service.js",
+  "scripts": {
+    "start": "node chirpstack-supabase-service.js",
+    "dev": "nodemon chirpstack-supabase-service.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "chirpstack",
+    "supabase",
+    "mqtt",
+    "lorawan",
+    "iot"
+  ],
+  "author": "ChirpStack AgriCOS",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.38.4",
+    "dotenv": "^16.3.1",
+    "mqtt": "^5.3.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
