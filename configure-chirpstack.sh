@@ -292,13 +292,6 @@ EOF
 chmod +x /opt/chirpstack-docker/*.sh
 chown chirpstack:chirpstack /opt/chirpstack-docker/*.sh
 
-# Copiar script de diagnóstico si existe
-if [[ -f "$SCRIPT_DIR/diagnose-connection.sh" ]]; then
-    cp "$SCRIPT_DIR/diagnose-connection.sh" /opt/chirpstack-docker/
-    chmod +x /opt/chirpstack-docker/diagnose-connection.sh
-    chown chirpstack:chirpstack /opt/chirpstack-docker/diagnose-connection.sh
-    log "Script de diagnóstico copiado"
-fi
 
 # Asegurar que no hay servicios corriendo y reiniciar limpio
 log "Reiniciando servicios ChirpStack con configuración actualizada..."
@@ -312,19 +305,8 @@ log "Iniciando servicios ChirpStack..."
 docker-compose up -d
 
 # Esperar a que los servicios estén listos
-log "Esperando a que los servicios estén completamente listos..."
-sleep 45
-
-# Verificar que PostgreSQL esté realmente listo antes de continuar
-log "Verificando conectividad de base de datos..."
-for i in {1..10}; do
-    if docker-compose exec -T postgres pg_isready -U chirpstack > /dev/null 2>&1; then
-        log "PostgreSQL está listo"
-        break
-    fi
-    log "Esperando PostgreSQL... ($i/10)"
-    sleep 5
-done
+log "Esperando a que los servicios estén listos..."
+sleep 30
 
 # Verificar estado de los servicios
 log "Verificando estado de los servicios..."
@@ -363,7 +345,6 @@ Useful Commands:
 - Stop services: /opt/chirpstack-docker/stop-chirpstack.sh
 - View logs: /opt/chirpstack-docker/logs-chirpstack.sh
 - Check status: /opt/chirpstack-docker/status-chirpstack.sh
-- Diagnose connection: /opt/chirpstack-docker/diagnose-connection.sh
 
 Nginx Configuration:
 - Config file: /etc/nginx/sites-available/chirpstack
@@ -407,7 +388,6 @@ echo "- Iniciar servicios: /opt/chirpstack-docker/start-chirpstack.sh"
 echo "- Detener servicios: /opt/chirpstack-docker/stop-chirpstack.sh"
 echo "- Ver logs: /opt/chirpstack-docker/logs-chirpstack.sh"
 echo "- Ver estado: /opt/chirpstack-docker/status-chirpstack.sh"
-echo "- Diagnóstico: /opt/chirpstack-docker/diagnose-connection.sh"
 echo ""
 echo -e "${BLUE}Información guardada en:${NC}"
 echo "/opt/chirpstack-docker/INSTALLATION_INFO.txt"

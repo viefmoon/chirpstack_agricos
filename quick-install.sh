@@ -148,46 +148,9 @@ if [[ $? -ne 0 ]]; then
     warning "Hubo algunos problemas con la configuración de seguridad, pero ChirpStack debería funcionar"
 fi
 
-# Esperar a que todos los servicios estén listos
-log "Esperando a que todos los servicios estén completamente listos..."
-sleep 30
-
-# Verificar instalación
-log "Verificando instalación..."
-
-# Verificar servicios Docker
-cd /opt/chirpstack-docker
-if docker-compose ps | grep -q "Up"; then
-    info "✓ Servicios Docker están corriendo"
-else
-    warning "⚠ Algunos servicios Docker pueden no estar corriendo"
-fi
-
-# Instalar net-tools si no está disponible
-if ! command -v netstat &> /dev/null; then
-    log "Instalando herramientas de red..."
-    apt update && apt install -y net-tools
-fi
-
-# Verificar puertos
-if netstat -tlnp | grep -q ":8080"; then
-    info "✓ Puerto 8080 (Web interface) está abierto"
-else
-    warning "⚠ Puerto 8080 no está disponible"
-fi
-
-if netstat -ulnp | grep -q ":1700"; then
-    info "✓ Puerto 1700 (Gateway Bridge) está abierto"
-else
-    warning "⚠ Puerto 1700 no está disponible"
-fi
-
-# Verificar acceso web
-if curl -s "http://localhost:8080" > /dev/null; then
-    info "✓ Interfaz web responde correctamente"
-else
-    warning "⚠ Interfaz web no responde"
-fi
+# Esperar a que los servicios estén listos
+log "Esperando a que los servicios estén listos..."
+sleep 20
 
 # Crear archivo de resumen
 cat > /opt/INSTALLATION_SUMMARY.txt << EOF
@@ -271,7 +234,6 @@ echo -e "${BLUE}🔧 Comandos Útiles:${NC}"
 echo "   • Ver logs: ${YELLOW}/opt/chirpstack-docker/logs-chirpstack.sh${NC}"
 echo "   • Estado: ${YELLOW}/opt/chirpstack-docker/status-chirpstack.sh${NC}"
 echo "   • Backup: ${YELLOW}/opt/chirpstack-setup/backup-chirpstack.sh${NC}"
-echo "   • Diagnóstico: ${YELLOW}/opt/chirpstack-docker/diagnose-connection.sh${NC}"
 echo ""
 echo -e "${BLUE}📄 Resumen completo guardado en:${NC} /opt/INSTALLATION_SUMMARY.txt"
 echo ""

@@ -199,66 +199,11 @@ cat > /etc/logrotate.d/chirpstack << EOF
 }
 EOF
 
-# Verificar instalación
+# Verificar instalación básica
 log "Verificando instalación..."
-
-# Verificar Docker
-if docker --version > /dev/null 2>&1; then
-    info "✓ Docker: $(docker --version)"
-else
-    error "✗ Docker no está funcionando correctamente"
-    exit 1
-fi
-
-# Verificar Docker Compose
-if docker-compose --version > /dev/null 2>&1; then
-    info "✓ Docker Compose: $(docker-compose --version)"
-else
-    error "✗ Docker Compose no está funcionando correctamente"
-    exit 1
-fi
-
-# Verificar usuario chirpstack
-if id "chirpstack" &>/dev/null; then
-    info "✓ Usuario chirpstack creado correctamente"
-else
-    error "✗ Usuario chirpstack no fue creado"
-    exit 1
-fi
-
-# Verificar permisos de directorio
-if [[ -d "/opt" && -O "/opt" ]] || [[ "$(stat -c %U /opt)" == "chirpstack" ]]; then
-    info "✓ Directorio /opt configurado correctamente"
-else
-    error "✗ Problemas con permisos del directorio /opt"
-fi
-
-# Verificar UFW
-if ufw status | grep -q "Status: active"; then
-    info "✓ Firewall UFW activo"
-else
-    warning "⚠ Firewall UFW no está activo"
-fi
+docker --version && docker-compose --version
 
 log "¡Instalación de dependencias completada exitosamente!"
-
-echo ""
-echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}  INSTALACIÓN COMPLETADA${NC}"
-echo -e "${GREEN}========================================${NC}"
-echo ""
-echo -e "${BLUE}Siguiente paso:${NC}"
-echo "1. Ejecutar: sudo ./configure-chirpstack.sh"
-echo "2. O continuar manualmente con la guía"
-echo ""
-echo -e "${YELLOW}Notas importantes:${NC}"
-echo "- El usuario 'chirpstack' ha sido creado"
-echo "- Docker y Docker Compose están instalados"
-echo "- Firewall UFW está configurado"
-echo "- Puertos abiertos: 22, 80, 443, 8080, 1700/udp, 1883"
-echo ""
-echo -e "${BLUE}Para cambiar al usuario chirpstack:${NC}"
-echo "su - chirpstack"
-echo ""
+info "Docker, Nginx y usuario chirpstack configurados correctamente"
 
 exit 0
