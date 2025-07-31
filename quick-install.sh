@@ -70,9 +70,9 @@ info "Usando dominio configurado: $DOMAIN"
 log "Si necesitas cambiar el dominio, edita este script"
 
 # Configurar región LoRaWAN automáticamente
-LORAWAN_REGION="US915"
-info "Región LoRaWAN configurada: $LORAWAN_REGION"
-log "Para cambiar región, edita este script o el archivo .env después"
+LORAWAN_REGION="us915_0"
+info "Región LoRaWAN configurada: $LORAWAN_REGION (US915 canales 0-7)"
+log "Para cambiar región, edita este script antes de ejecutar"
 
 # Mostrar configuración automática
 echo ""
@@ -125,7 +125,7 @@ echo ""
 # Personalizar configuración antes de ejecutar
 if [[ -f "configure-chirpstack.sh" ]]; then
     # Modificar región en el script si es necesario
-    sed -i "s/CHIRPSTACK_REGION=US915/CHIRPSTACK_REGION=$LORAWAN_REGION/" configure-chirpstack.sh
+    sed -i "s/CHIRPSTACK_REGION=\"us915_0\"/CHIRPSTACK_REGION=\"$LORAWAN_REGION\"/" configure-chirpstack.sh
 fi
 
 ./configure-chirpstack.sh

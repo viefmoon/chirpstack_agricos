@@ -47,6 +47,7 @@ PUBLIC_IP="143.244.144.51"
 POSTGRES_PASSWORD="chirpstack"  # Usar contraseña estándar de ChirpStack
 CHIRPSTACK_API_SECRET=$(generate_password)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CHIRPSTACK_REGION="us915_0"  # Región por defecto
 
 log "Iniciando configuración de ChirpStack..."
 log "IP Pública detectada: $PUBLIC_IP"
@@ -73,6 +74,69 @@ else
     git pull origin master || warning "No se pudo actualizar el repositorio"
 fi
 
+# Descargar archivos de configuración de regiones oficiales
+log "Descargando configuraciones de regiones oficiales..."
+mkdir -p configuration/chirpstack
+
+# Descargar configuraciones de las regiones más comunes
+for region in us915_0 eu868 as923 au915_0; do
+    if [[ ! -f "configuration/chirpstack/region_${region}.toml" ]]; then
+        log "Descargando configuración para región $region..."
+        curl -fsSL "https://raw.githubusercontent.com/chirpstack/chirpstack/master/chirpstack/configuration/region_${region}.toml" \
+             -o "configuration/chirpstack/region_${region}.toml" || warning "No se pudo descargar región $region"
+    fi
+done
+
+# Descargar configuración principal si no existe
+if [[ ! -f "configuration/chirpstack/chirpstack.toml" ]]; then
+    log "Descargando configuración principal..."
+    curl -fsSL "https://raw.githubusercontent.com/chirpstack/chirpstack/master/chirpstack/configuration/chirpstack.toml" \
+         -o "configuration/chirpstack/chirpstack.toml" || warning "No se pudo descargar configuración principal"
+fi
+
+# Configurar la región específica en el archivo principal
+log "Configurando región $CHIRPSTACK_REGION en chirpstack.toml..."
+if [[ -f "configuration/chirpstack/chirpstack.toml" ]]; then
+    # Crear backup del archivo original
+    cp "configuration/chirpstack/chirpstack.toml" "configuration/chirpstack/chirpstack.toml.backup"
+    
+    # Configurar solo la región especificada como habilitada
+    cat > "configuration/chirpstack/chirpstack.toml" << EOF
+# ChirpStack configuration for production deployment
+# Generated automatically by configure-chirpstack.sh
+
+[postgresql]
+dsn="postgres://chirpstack:chirpstack@postgres/chirpstack?sslmode=disable"
+
+[redis]
+servers=["redis://redis:6379"]
+
+[network]
+net_id="000000"
+enabled_regions=["$CHIRPSTACK_REGION"]
+
+[api]
+bind="0.0.0.0:8080"
+secret="$CHIRPSTACK_API_SECRET"
+
+[gateway.backend.mqtt]
+server="tcp://mosquitto:1883"
+client_id_template="chirpstack-gateway-{{ .GatewayID }}"
+
+[integration.mqtt]
+server="tcp://mosquitto:1883"
+client_id_template="chirpstack-application-{{ .ApplicationID }}"
+
+[join_server]
+bind="0.0.0.0:8003"
+
+EOF
+
+    log "Configuración personalizada aplicada para región $CHIRPSTACK_REGION"
+else
+    warning "No se pudo configurar el archivo chirpstack.toml"
+fi
+
 # Crear archivo de configuración .env usando la contraseña estándar
 log "Creando archivo de configuración .env..."
 cat > .env << EOF
@@ -86,14 +150,16 @@ REDIS_PASSWORD=
 CHIRPSTACK_API_SECRET=$CHIRPSTACK_API_SECRET
 
 # Región LoRaWAN - CRÍTICO: Debe coincidir con tu ubicación y gateway
-# Regiones principales:
-# - US915: Estados Unidos, Canadá, México, Brasil
-# - EU868: Europa, África, Rusia
-# - AS923: Asia-Pacífico (Japón, Singapur, etc.)
-# - AU915: Australia, Nueva Zelanda  
-# - CN470: China
-# - IN865: India
-CHIRPSTACK_REGION=US915
+# Regiones disponibles (ID de configuración):
+# - us915_0: Estados Unidos, Canadá, México, Brasil (canales 0-7)
+# - eu868: Europa, África, Rusia
+# - as923: Asia-Pacífico (Japón, Singapur, etc.)
+# - au915_0: Australia, Nueva Zelanda (canales 0-7)
+# - cn470_10: China
+# - in865: India
+# 
+# NOTA: El ID debe coincidir exactamente con el archivo region_XXX.toml
+CHIRPSTACK_REGION=us915_0
 
 EOF
 

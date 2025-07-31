@@ -222,21 +222,37 @@ sudo ./backup-chirpstack.sh --cleanup
 
 **⚠️ CRÍTICO:** La región debe coincidir con tu ubicación geográfica y gateway.
 
-#### Regiones Disponibles:
-- **US915:** Estados Unidos, Canadá, México, Brasil
-- **EU868:** Europa, África, Rusia  
-- **AS923:** Asia-Pacífico (Japón, Singapur, etc.)
-- **AU915:** Australia, Nueva Zelanda
-- **CN470:** China
-- **IN865:** India
+#### Regiones Disponibles (ID de configuración):
+- **us915_0:** Estados Unidos, Canadá, México, Brasil (canales 0-7)
+- **us915_1:** Estados Unidos, Canadá, México, Brasil (canales 8-15)  
+- **eu868:** Europa, África, Rusia  
+- **as923:** Asia-Pacífico (Japón, Singapur, etc.)
+- **au915_0:** Australia, Nueva Zelanda (canales 0-7)
+- **cn470_10:** China
+- **in865:** India
 
-#### Cambiar Región:
+#### Cambiar Región Antes de Instalar:
+```bash
+# Editar quick-install.sh antes de ejecutar
+nano quick-install.sh
+
+# Cambiar línea:
+LORAWAN_REGION="eu868"  # Cambiar por tu región
+```
+
+#### Cambiar Región Después de Instalar:
 ```bash
 # Editar archivo de configuración
 nano /opt/chirpstack-docker/.env
 
+# Cambiar línea:  
+CHIRPSTACK_REGION=eu868  # Cambiar por tu región
+
+# Editar configuración principal
+nano /opt/chirpstack-docker/configuration/chirpstack/chirpstack.toml
+
 # Cambiar línea:
-CHIRPSTACK_REGION=EU868  # Cambiar por tu región
+enabled_regions=["eu868"]  # Tu región
 
 # Reiniciar servicios
 cd /opt/chirpstack-docker
