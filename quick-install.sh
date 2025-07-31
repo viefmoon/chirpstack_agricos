@@ -85,14 +85,14 @@ echo ""
 log "Instalación iniciada automáticamente..."
 sleep 2
 
-# Crear directorio de trabajo
-WORK_DIR="/opt/chirpstack-setup"
-mkdir -p "$WORK_DIR"
-cd "$WORK_DIR"
+# Obtener directorio actual del script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+log "Ejecutando desde: $SCRIPT_DIR"
 
-# Verificar que los scripts estén disponibles
-if [[ ! -f "./install-dependencies.sh" ]] || [[ ! -f "./configure-chirpstack.sh" ]] || [[ ! -f "./setup-security.sh" ]]; then
-    error "Scripts no encontrados. Asegúrate de ejecutar desde el directorio del repositorio:"
+# Verificar que los scripts estén disponibles en el directorio actual
+if [[ ! -f "$SCRIPT_DIR/install-dependencies.sh" ]] || [[ ! -f "$SCRIPT_DIR/configure-chirpstack.sh" ]] || [[ ! -f "$SCRIPT_DIR/setup-security.sh" ]]; then
+    error "Scripts no encontrados en $SCRIPT_DIR"
+    error "Asegúrate de ejecutar desde el directorio del repositorio:"
     error "git clone https://github.com/viefmoon/chirpstack_agricos.git"
     error "cd chirpstack_agricos"
     error "chmod +x *.sh"
@@ -103,7 +103,10 @@ fi
 log "Scripts encontrados correctamente"
 
 # Hacer scripts ejecutables
-chmod +x *.sh
+chmod +x "$SCRIPT_DIR"/*.sh
+
+# Trabajar desde el directorio del script
+cd "$SCRIPT_DIR"
 
 # PASO 1: Instalar dependencias
 log "PASO 1/3: Instalando dependencias del sistema..."
