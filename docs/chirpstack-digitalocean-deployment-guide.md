@@ -9,21 +9,24 @@ Esta guía te llevará paso a paso para deployar una infraestructura completa de
 Si quieres ir directo al grano:
 
 ```bash
+# Si reconstruiste el droplet, borra las claves SSH:
+ssh-keygen -R 143.244.144.51
+
 # Conectar al servidor
 ssh root@143.244.144.51
 
-# Descargar e instalar
+# Descargar e instalar (completo con HTTPS automático)
 git clone https://github.com/viefmoon/chirpstack_agricos.git
 cd chirpstack_agricos
 chmod +x *.sh
-sudo ./quick-install.sh
+sudo ./install.sh
 
 # CRÍTICO: Cambiar contraseña admin
-# - Ir a: http://143.244.144.51:8080
+# - Ir a: https://network.sense.lat
 # - Login: admin/admin → Avatar → Change password
 
-# Configurar DNS: network.sense.lat → 143.244.144.51
-# Acceder: https://network.sense.lat
+# DNS ya configurado: network.sense.lat → 143.244.144.51
+# Acceso final: https://network.sense.lat
 ```
 
 ## Tabla de Contenidos
@@ -130,6 +133,9 @@ Para configurar ChirpStack en `network.sense.lat` usando DigitalOcean DNS:
 ### 1. Conexión SSH
 
 ```bash
+# Si reconstruiste el droplet:
+ssh-keygen -R 143.244.144.51
+
 ssh root@143.244.144.51
 ```
 
@@ -195,7 +201,7 @@ git clone https://github.com/viefmoon/chirpstack_agricos.git .
 chmod +x *.sh
 
 # Ejecutar instalación automática
-./quick-install.sh
+./install.sh
 ```
 
 O si prefieres instalación manual paso a paso:

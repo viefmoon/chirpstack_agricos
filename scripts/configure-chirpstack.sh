@@ -113,7 +113,18 @@ servers=["redis://redis:6379"]
 
 [network]
 net_id="000000"
-enabled_regions=["$CHIRPSTACK_REGION"]
+EOF
+
+# Configurar regiones según el parámetro
+if [[ "$CHIRPSTACK_REGION" == "multi" ]]; then
+    echo 'enabled_regions=["eu868", "us915_0", "us915_1", "as923", "au915_0", "cn470_10", "in865"]' >> "configuration/chirpstack/chirpstack.toml"
+    info "✓ Configuración multi-región habilitada: EU868, US915, AS923, AU915, CN470, IN865"
+else
+    echo "enabled_regions=[\"$CHIRPSTACK_REGION\"]" >> "configuration/chirpstack/chirpstack.toml"
+    info "✓ Región específica configurada: $CHIRPSTACK_REGION"
+fi
+
+cat >> "configuration/chirpstack/chirpstack.toml" << EOF
 
 [api]
 bind="0.0.0.0:8080"

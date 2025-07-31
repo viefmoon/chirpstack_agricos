@@ -10,7 +10,7 @@ Esta es una guía completa para deployar ChirpStack v4 en un droplet de DigitalO
 # 1. Conectar al servidor
 ssh root@143.244.144.51
 
-# 2. Descargar y ejecutar (100% automático)
+# 2. Descargar y ejecutar (100% automático con HTTPS)
 git clone https://github.com/viefmoon/chirpstack_agricos.git
 cd chirpstack_agricos
 chmod +x install.sh
@@ -19,17 +19,17 @@ sudo ./install.sh
 # ¡Eso es todo! El script hace TODO automáticamente:
 # - Instala dependencias (Docker, Node.js, Nginx)
 # - Configura ChirpStack v4 con regiones oficiales
-# - Configura HTTPS para network.sense.lat
-# - Configura firewall y seguridad
+# - Configura HTTPS automático para network.sense.lat
+# - Configura firewall y seguridad avanzada
 # - Instala servicio ChirpStack-Supabase (opcional)
 
 # 3. CAMBIAR CONTRASEÑA (CRÍTICO):
-#    - Ir a: http://143.244.144.51:8080
+#    - Ir a: https://network.sense.lat
 #    - Login: admin/admin
 #    - Avatar → Change password
 
-# 4. Configurar DNS: network.sense.lat → 143.244.144.51
-# 5. Acceder: https://network.sense.lat
+# DNS ya configurado: network.sense.lat → 143.244.144.51
+# Acceso final: https://network.sense.lat
 ```
 
 ## 📁 Estructura del Repositorio
@@ -66,6 +66,11 @@ chirpstack_agricos/
    ```bash
    ssh root@143.244.144.51
    ```
+   
+   > **💡 Si reconstruiste el droplet**, borra las claves SSH anteriores:
+   > ```bash
+   > ssh-keygen -R 143.244.144.51
+   > ```
 
 ### Paso 2: Descargar e Instalar
 
@@ -83,9 +88,9 @@ tree -L 2
 
 ### Paso 3: Ejecutar Instalación
 
-#### Opción A: Instalación Automática (Recomendado)
+#### Opción A: Instalación Automática Completa (Recomendado)
 ```bash
-# Instalación completa en un solo comando
+# Instalación completa con HTTPS automático
 sudo ./install.sh
 ```
 
@@ -158,7 +163,7 @@ sudo ./scripts/configure-chirpstack.sh
 ```
 
 **Resultado:**
-- ChirpStack accesible en `http://143.244.144.51:8080`
+- ChirpStack accesible en `https://network.sense.lat`
 - Usuario: `admin` / Contraseña: `admin`
 
 #### 3. scripts/setup-security.sh
@@ -231,7 +236,7 @@ sudo ./scripts/backup-chirpstack.sh --cleanup
 
 ## 🔍 Acceso Post-Instalación
 
-1. **Abrir navegador:** `http://143.244.144.51:8080` (o `https://network.sense.lat`)
+1. **Abrir navegador:** `https://network.sense.lat`
 2. **Login:** `admin` / `admin`  
 3. **¡IMPORTANTE!** Cambiar contraseña inmediatamente
 

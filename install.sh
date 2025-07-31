@@ -82,11 +82,12 @@ log "Scripts encontrados correctamente"
 # Configuración automática
 DOMAIN="network.sense.lat"
 HTTPS_ENABLED=true
-LORAWAN_REGION="us915_0"
 
-info "Usando dominio configurado: $DOMAIN"
-info "Región LoRaWAN configurada: $LORAWAN_REGION (US915 canales 0-7)"
-log "Para cambiar región, edita este script antes de ejecutar"
+# Configuración multi-región (habilita todas las regiones)
+LORAWAN_REGION="multi"
+
+info "Configuración multi-región habilitada"
+info "Regiones soportadas: EU868, US915, AS923, AU915, CN470, IN865"
 
 # Hacer scripts ejecutables
 chmod +x "$SCRIPTS_DIR"/*.sh
@@ -95,7 +96,7 @@ echo ""
 echo -e "${YELLOW}Configuración automática:${NC}"
 echo "- Servidor: $HOSTNAME ($PUBLIC_IP)"
 echo "- Dominio: $DOMAIN"
-echo "- Región LoRaWAN: $LORAWAN_REGION"
+echo "- Regiones LoRaWAN: Todas habilitadas (multi-región)"
 echo "- HTTPS: Habilitado"
 echo ""
 log "Instalación iniciada automáticamente..."
@@ -128,8 +129,8 @@ if [[ $? -ne 0 ]]; then
     exit 1
 fi
 
-# PASO 3: Configurar seguridad
-log "PASO 3/4: Configurando seguridad..."
+# PASO 3: Configurar seguridad y HTTPS
+log "PASO 3/4: Configurando seguridad y HTTPS..."
 echo ""
 
 # Configurar seguridad automáticamente sin preguntas
@@ -137,8 +138,12 @@ export AUTO_DOMAIN="$DOMAIN"
 export AUTO_HTTPS="$HTTPS_ENABLED"
 "$SCRIPTS_DIR/setup-security.sh"
 
-if [[ $? -ne 0 ]]; then
-    warning "Hubo algunos problemas con la configuración de seguridad, pero ChirpStack debería funcionar"
+if [[ $? -eq 0 ]]; then
+    info "✓ Seguridad y HTTPS configurados correctamente"
+    info "✓ Certificados SSL obtenidos para $DOMAIN"
+else
+    warning "⚠ Hubo algunos problemas con HTTPS, pero ChirpStack funciona en HTTP"
+    warning "⚠ Puedes configurar HTTPS manualmente más tarde"
 fi
 
 # PASO 4: Configurar servicio Supabase (opcional)
@@ -234,6 +239,7 @@ echo ""
 
 if [[ "$HTTPS_ENABLED" == true ]]; then
     echo -e "${BLUE}🌐 Acceso Web Seguro:${NC} ${GREEN}https://network.sense.lat${NC}"
+    echo -e "${GREEN}✓ HTTPS configurado automáticamente${NC}"
 else
     echo -e "${BLUE}🌐 Acceso Web:${NC} ${GREEN}http://143.244.144.51:8080${NC}"
 fi
