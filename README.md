@@ -39,6 +39,7 @@ sudo ./quick-install.sh
 - **`setup-security.sh`** - Script de configuración de seguridad y HTTPS
 - **`backup-chirpstack.sh`** - Script completo de backup y restauración
 - **`quick-install.sh`** - Instalación automática completa
+- **`diagnose-connection.sh`** - Script de diagnóstico para problemas de conexión
 
 ## 🚀 Instalación Rápida (Automática)
 
@@ -227,6 +228,9 @@ netstat -tlnp | grep -E '(8080|1700|1883)'
 
 # Monitoreo de seguridad
 /opt/security-monitor.sh
+
+# Diagnóstico de conexión
+/opt/chirpstack-agricos/diagnose-connection.sh
 ```
 
 ### Tareas Automáticas Configuradas
@@ -331,7 +335,29 @@ docker-compose logs chirpstack | grep -i region
 docker-compose logs postgres
 
 # Conectar a la base de datos
-docker-compose exec postgres psql -U postgres chirpstack
+docker-compose exec postgres psql -U chirpstack chirpstack
+
+# Ejecutar diagnóstico completo
+sudo ./diagnose-connection.sh
+```
+
+### Problema: Error "password authentication failed"
+
+Este es un problema común cuando las credenciales no coinciden. Solución:
+
+```bash
+# 1. Detener servicios
+cd /opt/chirpstack-docker
+docker-compose down -v
+
+# 2. Verificar credenciales en .env
+cat .env | grep POSTGRES
+
+# 3. Reiniciar con volúmenes limpios
+docker-compose up -d
+
+# 4. Verificar logs
+docker-compose logs chirpstack
 ```
 
 ## 📝 Requisitos del Sistema

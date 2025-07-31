@@ -44,8 +44,9 @@ generate_password() {
 # Variables de configuración
 CHIRPSTACK_DIR="/opt/chirpstack-docker"
 PUBLIC_IP="143.244.144.51"
-POSTGRES_PASSWORD="chirpstack_ns"  # Usar contraseña por defecto de ChirpStack
+POSTGRES_PASSWORD="chirpstack"  # Usar contraseña estándar de ChirpStack
 CHIRPSTACK_API_SECRET=$(generate_password)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 log "Iniciando configuración de ChirpStack..."
 log "IP Pública detectada: $PUBLIC_IP"
@@ -76,7 +77,7 @@ fi
 log "Creando archivo de configuración .env..."
 cat > .env << EOF
 # PostgreSQL Configuration
-POSTGRES_PASSWORD=chirpstack_ns
+POSTGRES_PASSWORD=chirpstack
 
 # Redis Configuration
 REDIS_PASSWORD=
@@ -165,11 +166,13 @@ services:
       - ./configuration/postgresql/initdb:/docker-entrypoint-initdb.d
       - postgresqldata:/var/lib/postgresql/data
     environment:
-      - POSTGRES_PASSWORD=chirpstack_ns
+      - POSTGRES_PASSWORD=chirpstack
+      - POSTGRES_USER=chirpstack
+      - POSTGRES_DB=chirpstack
     networks:
       - chirpstack
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U chirpstack"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -289,6 +292,14 @@ EOF
 chmod +x /opt/chirpstack-docker/*.sh
 chown chirpstack:chirpstack /opt/chirpstack-docker/*.sh
 
+# Copiar script de diagnóstico si existe
+if [[ -f "$SCRIPT_DIR/diagnose-connection.sh" ]]; then
+    cp "$SCRIPT_DIR/diagnose-connection.sh" /opt/chirpstack-docker/
+    chmod +x /opt/chirpstack-docker/diagnose-connection.sh
+    chown chirpstack:chirpstack /opt/chirpstack-docker/diagnose-connection.sh
+    log "Script de diagnóstico copiado"
+fi
+
 # Asegurar que no hay servicios corriendo y reiniciar limpio
 log "Reiniciando servicios ChirpStack con configuración actualizada..."
 cd "$CHIRPSTACK_DIR"
@@ -307,7 +318,7 @@ sleep 45
 # Verificar que PostgreSQL esté realmente listo antes de continuar
 log "Verificando conectividad de base de datos..."
 for i in {1..10}; do
-    if docker-compose exec -T postgres pg_isready -U postgres > /dev/null 2>&1; then
+    if docker-compose exec -T postgres pg_isready -U chirpstack > /dev/null 2>&1; then
         log "PostgreSQL está listo"
         break
     fi
@@ -331,7 +342,7 @@ Server IP: $PUBLIC_IP
 Installation Directory: $CHIRPSTACK_DIR
 
 Database Configuration:
-- PostgreSQL Password: chirpstack_ns (default)
+- PostgreSQL Password: chirpstack (default)
 - ChirpStack API Secret: $CHIRPSTACK_API_SECRET
 
 Web Interface:
@@ -352,6 +363,7 @@ Useful Commands:
 - Stop services: /opt/chirpstack-docker/stop-chirpstack.sh
 - View logs: /opt/chirpstack-docker/logs-chirpstack.sh
 - Check status: /opt/chirpstack-docker/status-chirpstack.sh
+- Diagnose connection: /opt/chirpstack-docker/diagnose-connection.sh
 
 Nginx Configuration:
 - Config file: /etc/nginx/sites-available/chirpstack
@@ -395,6 +407,7 @@ echo "- Iniciar servicios: /opt/chirpstack-docker/start-chirpstack.sh"
 echo "- Detener servicios: /opt/chirpstack-docker/stop-chirpstack.sh"
 echo "- Ver logs: /opt/chirpstack-docker/logs-chirpstack.sh"
 echo "- Ver estado: /opt/chirpstack-docker/status-chirpstack.sh"
+echo "- Diagnóstico: /opt/chirpstack-docker/diagnose-connection.sh"
 echo ""
 echo -e "${BLUE}Información guardada en:${NC}"
 echo "/opt/chirpstack-docker/INSTALLATION_INFO.txt"

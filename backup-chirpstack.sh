@@ -80,13 +80,13 @@ backup_database() {
     fi
     
     # Crear backup de la base de datos
-    docker-compose exec -T postgres pg_dump -U postgres chirpstack > "$BACKUP_DIR/chirpstack_database.sql" || {
+    docker-compose exec -T postgres pg_dump -U chirpstack chirpstack > "$BACKUP_DIR/chirpstack_database.sql" || {
         error "Error al crear backup de base de datos"
         return 1
     }
     
     # Backup de usuarios y roles
-    docker-compose exec -T postgres pg_dumpall -U postgres --roles-only > "$BACKUP_DIR/chirpstack_roles.sql" || {
+    docker-compose exec -T postgres pg_dumpall -U chirpstack --roles-only > "$BACKUP_DIR/chirpstack_roles.sql" || {
         warning "No se pudo hacer backup de roles"
     }
     

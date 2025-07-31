@@ -398,7 +398,7 @@ cp /etc/fail2ban/jail.local "$BACKUP_DIR/$DATE/" 2>/dev/null || true
 
 # Backup de la base de datos ChirpStack
 cd /opt/chirpstack-docker
-docker-compose exec -T postgres pg_dump -U postgres chirpstack > "$BACKUP_DIR/$DATE/chirpstack_db_backup.sql" 2>/dev/null || echo "Database backup failed"
+docker-compose exec -T postgres pg_dump -U chirpstack chirpstack > "$BACKUP_DIR/$DATE/chirpstack_db_backup.sql" 2>/dev/null || echo "Database backup failed"
 
 # Comprimir backup
 cd "$BACKUP_DIR"
