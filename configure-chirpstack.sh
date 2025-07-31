@@ -44,7 +44,7 @@ generate_password() {
 # Variables de configuración
 CHIRPSTACK_DIR="/opt/chirpstack-docker"
 PUBLIC_IP="143.244.144.51"
-POSTGRES_PASSWORD=$(generate_password)
+POSTGRES_PASSWORD="chirpstack_ns"  # Usar contraseña por defecto de ChirpStack
 CHIRPSTACK_API_SECRET=$(generate_password)
 
 log "Iniciando configuración de ChirpStack..."
@@ -72,16 +72,16 @@ else
     git pull origin master || warning "No se pudo actualizar el repositorio"
 fi
 
-# Crear archivo de configuración .env
+# Crear archivo de configuración .env usando la contraseña estándar
 log "Creando archivo de configuración .env..."
 cat > .env << EOF
 # PostgreSQL Configuration
-POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+POSTGRES_PASSWORD=chirpstack_ns
 
-# Redis Configuration (usar contraseña vacía por simplicidad)
+# Redis Configuration
 REDIS_PASSWORD=
 
-# ChirpStack Configuration
+# ChirpStack API Secret
 CHIRPSTACK_API_SECRET=$CHIRPSTACK_API_SECRET
 
 # Región LoRaWAN - CRÍTICO: Debe coincidir con tu ubicación y gateway
@@ -94,31 +94,12 @@ CHIRPSTACK_API_SECRET=$CHIRPSTACK_API_SECRET
 # - IN865: India
 CHIRPSTACK_REGION=US915
 
-# Network Server Configuration
-CHIRPSTACK_NETWORK_SERVER_BIND=0.0.0.0:8000
-
-# Application Server Configuration  
-CHIRPSTACK_APPLICATION_SERVER_BIND=0.0.0.0:8080
-
-# Web Interface
-CHIRPSTACK_WEB_BIND=0.0.0.0:8080
-
-# External hostname/IP
-CHIRPSTACK_EXTERNAL_HOST=network.sense.lat
-
-# MQTT Broker
-MQTT_BROKER_HOST=mosquitto
-MQTT_BROKER_PORT=1883
-
-# Gateway Bridge
-GATEWAY_BRIDGE_MQTT_TOPIC_PREFIX=gateway/
-
 EOF
 
 # Crear configuración personalizada de Docker Compose para producción
 log "Creando configuración Docker Compose para producción..."
 cat > docker-compose.yml << 'EOF'
-version: "3.8"
+# Docker Compose file for ChirpStack v4
 
 services:
   chirpstack:
@@ -184,7 +165,7 @@ services:
       - ./configuration/postgresql/initdb:/docker-entrypoint-initdb.d
       - postgresqldata:/var/lib/postgresql/data
     environment:
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_PASSWORD=chirpstack_ns
     networks:
       - chirpstack
     healthcheck:
@@ -308,14 +289,31 @@ EOF
 chmod +x /opt/chirpstack-docker/*.sh
 chown chirpstack:chirpstack /opt/chirpstack-docker/*.sh
 
-# Iniciar servicios como usuario chirpstack
-log "Iniciando servicios ChirpStack..."
+# Asegurar que no hay servicios corriendo y reiniciar limpio
+log "Reiniciando servicios ChirpStack con configuración actualizada..."
 cd "$CHIRPSTACK_DIR"
-su - chirpstack -c "cd $CHIRPSTACK_DIR && docker-compose up -d"
+
+# Detener cualquier servicio existente y limpiar volúmenes problemáticos
+docker-compose down -v || true
+
+# Iniciar servicios con la nueva configuración
+log "Iniciando servicios ChirpStack..."
+docker-compose up -d
 
 # Esperar a que los servicios estén listos
-log "Esperando a que los servicios estén listos..."
-sleep 30
+log "Esperando a que los servicios estén completamente listos..."
+sleep 45
+
+# Verificar que PostgreSQL esté realmente listo antes de continuar
+log "Verificando conectividad de base de datos..."
+for i in {1..10}; do
+    if docker-compose exec -T postgres pg_isready -U postgres > /dev/null 2>&1; then
+        log "PostgreSQL está listo"
+        break
+    fi
+    log "Esperando PostgreSQL... ($i/10)"
+    sleep 5
+done
 
 # Verificar estado de los servicios
 log "Verificando estado de los servicios..."
@@ -333,7 +331,7 @@ Server IP: $PUBLIC_IP
 Installation Directory: $CHIRPSTACK_DIR
 
 Database Configuration:
-- PostgreSQL Password: $POSTGRES_PASSWORD
+- PostgreSQL Password: chirpstack_ns (default)
 - ChirpStack API Secret: $CHIRPSTACK_API_SECRET
 
 Web Interface:

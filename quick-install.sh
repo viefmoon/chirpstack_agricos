@@ -163,6 +163,12 @@ else
     warning "⚠ Algunos servicios Docker pueden no estar corriendo"
 fi
 
+# Instalar net-tools si no está disponible
+if ! command -v netstat &> /dev/null; then
+    log "Instalando herramientas de red..."
+    apt update && apt install -y net-tools
+fi
+
 # Verificar puertos
 if netstat -tlnp | grep -q ":8080"; then
     info "✓ Puerto 8080 (Web interface) está abierto"
