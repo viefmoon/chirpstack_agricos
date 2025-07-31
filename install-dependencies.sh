@@ -71,6 +71,10 @@ apt install -y \
 # Instalar Docker
 log "Instalando Docker..."
 if ! command -v docker &> /dev/null; then
+    # Limpiar cualquier configuración anterior de Docker
+    rm -f /etc/apt/sources.list.d/docker.list
+    rm -f /etc/apt/keyrings/docker.asc
+    
     # Agregar Docker GPG key (método actualizado para Ubuntu 24.04)
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.asc
     chmod a+r /etc/apt/keyrings/docker.asc
@@ -78,8 +82,11 @@ if ! command -v docker &> /dev/null; then
     # Agregar repositorio Docker
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
     
-    # Instalar Docker
+    # Limpiar caché apt y actualizar
+    apt clean
     apt update
+    
+    # Instalar Docker
     apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
     
     # Iniciar y habilitar Docker
