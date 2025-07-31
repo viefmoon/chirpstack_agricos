@@ -41,14 +41,9 @@ generate_password() {
     openssl rand -base64 32 | tr -d "=+/" | cut -c1-25
 }
 
-# Función para obtener IP pública
-get_public_ip() {
-    curl -s http://checkip.amazonaws.com/ || curl -s http://icanhazip.com/ || echo "127.0.0.1"
-}
-
 # Variables de configuración
 CHIRPSTACK_DIR="/opt/chirpstack-docker"
-PUBLIC_IP=$(get_public_ip)
+PUBLIC_IP="143.244.144.51"
 POSTGRES_PASSWORD=$(generate_password)
 CHIRPSTACK_API_SECRET=$(generate_password)
 
@@ -89,8 +84,14 @@ REDIS_PASSWORD=
 # ChirpStack Configuration
 CHIRPSTACK_API_SECRET=$CHIRPSTACK_API_SECRET
 
-# Región LoRaWAN - cambiar según tu ubicación
-# Opciones: EU868, US915, AS923_1, AS923_2, AS923_3, AS923_4, AU915, CN470, CN779, EU433, IN865, KR920, RU864
+# Región LoRaWAN - CRÍTICO: Debe coincidir con tu ubicación y gateway
+# Regiones principales:
+# - US915: Estados Unidos, Canadá, México, Brasil
+# - EU868: Europa, África, Rusia
+# - AS923: Asia-Pacífico (Japón, Singapur, etc.)
+# - AU915: Australia, Nueva Zelanda  
+# - CN470: China
+# - IN865: India
 CHIRPSTACK_REGION=US915
 
 # Network Server Configuration
@@ -102,8 +103,8 @@ CHIRPSTACK_APPLICATION_SERVER_BIND=0.0.0.0:8080
 # Web Interface
 CHIRPSTACK_WEB_BIND=0.0.0.0:8080
 
-# External hostname/IP (cambiar por tu dominio si tienes uno)
-CHIRPSTACK_EXTERNAL_HOST=$PUBLIC_IP
+# External hostname/IP
+CHIRPSTACK_EXTERNAL_HOST=network.sense.lat
 
 # MQTT Broker
 MQTT_BROKER_HOST=mosquitto
@@ -223,7 +224,7 @@ log "Configurando Nginx como reverse proxy..."
 cat > /etc/nginx/sites-available/chirpstack << EOF
 server {
     listen 80;
-    server_name $PUBLIC_IP;  # Cambiar por tu dominio cuando lo configures
+    server_name network.sense.lat;
 
     # Aumentar tamaño máximo de subida
     client_max_body_size 10M;
@@ -320,11 +321,6 @@ sleep 30
 log "Verificando estado de los servicios..."
 su - chirpstack -c "cd $CHIRPSTACK_DIR && docker-compose ps"
 
-# Importar dispositivos LoRaWAN si es posible
-log "Intentando importar dispositivos LoRaWAN..."
-if [[ -f "Makefile" ]]; then
-    su - chirpstack -c "cd $CHIRPSTACK_DIR && make import-lorawan-devices" || warning "No se pudieron importar dispositivos LoRaWAN"
-fi
 
 # Crear archivo de información de la instalación
 log "Creando archivo de información de la instalación..."
@@ -341,7 +337,8 @@ Database Configuration:
 - ChirpStack API Secret: $CHIRPSTACK_API_SECRET
 
 Web Interface:
-- URL: http://$PUBLIC_IP:8080
+- URL: http://143.244.144.51:8080
+- URL with domain: https://network.sense.lat (after DNS setup)
 - Default Username: admin
 - Default Password: admin
 
@@ -380,12 +377,20 @@ echo -e "${GREEN}  CHIRPSTACK CONFIGURADO EXITOSAMENTE${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo -e "${BLUE}Información de acceso:${NC}"
-echo -e "URL: ${YELLOW}http://$PUBLIC_IP:8080${NC}"
+echo -e "URL: ${YELLOW}http://143.244.144.51:8080${NC}"
+echo -e "URL con dominio: ${YELLOW}https://network.sense.lat${NC} (después de configurar DNS)"
 echo -e "Usuario: ${YELLOW}admin${NC}"
 echo -e "Contraseña: ${YELLOW}admin${NC}"
 echo ""
-echo -e "${RED}¡IMPORTANTE!${NC}"
-echo -e "${RED}Cambia la contraseña por defecto inmediatamente${NC}"
+echo -e "${RED}🚨 PASO CRÍTICO INMEDIATO:${NC}"
+echo -e "${RED}CAMBIAR CONTRASEÑA DE ADMIN (OBLIGATORIO)${NC}"
+echo ""
+echo -e "${YELLOW}Cómo cambiar contraseña:${NC}"
+echo "1. Ir a: http://143.244.144.51:8080"
+echo "2. Login: admin / admin"
+echo "3. Clic en avatar (esquina superior derecha)"
+echo "4. Ir a 'Change password'"
+echo "5. Crear contraseña segura"
 echo ""
 echo -e "${BLUE}Comandos útiles:${NC}"
 echo "- Iniciar servicios: /opt/chirpstack-docker/start-chirpstack.sh"
@@ -398,6 +403,8 @@ echo "/opt/chirpstack-docker/INSTALLATION_INFO.txt"
 echo ""
 echo -e "${YELLOW}Siguiente paso recomendado:${NC}"  
 echo "sudo ./setup-security.sh (para configurar HTTPS)"
+echo ""
+echo -e "${RED}⚠️  NO uses en producción con contraseña 'admin'${NC}"
 echo ""
 
 exit 0

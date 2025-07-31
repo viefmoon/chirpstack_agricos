@@ -1,6 +1,30 @@
-# Guía Completa: Despliegue de ChirpStack en DigitalOcean
+# Guía Completa: Despliegue de ChirpStack v4 en DigitalOcean
 
-Esta guía te llevará paso a paso para deployar una infraestructura completa de ChirpStack en un droplet de DigitalOcean desde cero.
+Esta guía te llevará paso a paso para deployar una infraestructura completa de ChirpStack v4 en un droplet de DigitalOcean desde cero.
+
+> **Optimizado para Ubuntu 24.04 LTS:** Esta guía aprovecha las mejoras de seguridad, rendimiento y compatibilidad de Ubuntu 24.04 LTS, combinadas con ChirpStack v4 que unifica el Network Server y Application Server en un solo componente.
+
+## ⚡ Instalación Rápida
+
+Si quieres ir directo al grano:
+
+```bash
+# Conectar al servidor
+ssh root@143.244.144.51
+
+# Descargar e instalar
+git clone https://github.com/viefmoon/chirpstack_agricos.git
+cd chirpstack_agricos
+chmod +x *.sh
+sudo ./quick-install.sh
+
+# CRÍTICO: Cambiar contraseña admin
+# - Ir a: http://143.244.144.51:8080
+# - Login: admin/admin → Avatar → Change password
+
+# Configurar DNS: network.sense.lat → 143.244.144.51
+# Acceder: https://network.sense.lat
+```
 
 ## Tabla de Contenidos
 
@@ -8,11 +32,10 @@ Esta guía te llevará paso a paso para deployar una infraestructura completa de
 2. [Configuración del Droplet DigitalOcean](#configuración-del-droplet-digitalocean)
 3. [Preparación del Servidor](#preparación-del-servidor)
 4. [Instalación de Dependencias](#instalación-de-dependencias)
-5. [Configuración de Base de Datos](#configuración-de-base-de-datos)
-6. [Instalación de ChirpStack](#instalación-de-chirpstack)
-7. [Configuración de Seguridad](#configuración-de-seguridad)
-8. [Verificación y Testing](#verificación-y-testing)
-9. [Mantenimiento y Troubleshooting](#mantenimiento-y-troubleshooting)
+5. [Instalación de ChirpStack v4](#instalación-de-chirpstack-v4)
+6. [Configuración de Seguridad](#configuración-de-seguridad)
+7. [Verificación y Testing](#verificación-y-testing)
+8. [Mantenimiento y Troubleshooting](#mantenimiento-y-troubleshooting)
 
 ## Requisitos Previos
 
@@ -27,7 +50,7 @@ Esta guía te llevará paso a paso para deployar una infraestructura completa de
 
 1. **Accede a tu panel de DigitalOcean**
 2. **Crear nuevo Droplet:**
-   - **Imagen:** Ubuntu 22.04 LTS x64
+   - **Imagen:** Ubuntu 24.04 LTS x64
    - **Tipo:** Basic
    - **CPU:** 2 vCPUs, 4GB RAM, 80GB SSD (mínimo recomendado)
    - **Región:** Selecciona la más cercana a tu ubicación
@@ -40,23 +63,74 @@ Esta guía te llevará paso a paso para deployar una infraestructura completa de
 
 ### 2. Configuración inicial de red
 
-Una vez creado el droplet, anota la IP pública asignada. Esta será tu `SERVER_IP`.
+Tu droplet ChirpStack tiene la IP pública: **`143.244.144.51`**
 
-### 3. Configuración de DNS (Opcional)
+### 3. Configuración de DNS para `network.sense.lat`
 
-Si tienes un dominio, configura los registros DNS:
+Para configurar ChirpStack en `network.sense.lat` usando DigitalOcean DNS:
 
-```
-A    chirpstack    SERVER_IP
-A    mqtt         SERVER_IP
-```
+1. **Verificar que `sense.lat` esté en DigitalOcean DNS:**
+   - Ve a **Networking** → **Domains**
+   - Si no ves `sense.lat`, agrégalo con **Add Domain**
+   - Asegúrate de que los nameservers estén configurados en tu registrador
+
+2. **Agregar subdominio para ChirpStack:**
+   - En la página de `sense.lat`, clic **Add Record**
+   - **Tipo:** `A`
+   - **Hostname:** `network`
+   - **Will direct to:** Selecciona tu droplet ChirpStack
+   - **TTL:** 3600 (1 hour)
+   - Clic **Create Record**
+
+3. **Resultado:** ChirpStack será accesible en `https://network.sense.lat`
+
+## 📋 Pasos Específicos para Configurar `network.sense.lat`
+
+### Opción A: Si `sense.lat` ya está en DigitalOcean DNS
+
+1. **Ir a DigitalOcean:**
+   - Panel → **Networking** → **Domains**
+   - Clic en `sense.lat`
+
+2. **Agregar registro A:**
+   - Clic **Add Record**
+   - **Type:** A
+   - **Hostname:** `network`
+   - **Will direct to:** Selecciona tu droplet ChirpStack
+   - **TTL:** 3600
+   - Clic **Create Record**
+
+3. **Verificar:** En 5-10 minutos `network.sense.lat` apuntará a tu servidor
+
+### Opción B: Si `sense.lat` NO está en DigitalOcean DNS
+
+1. **Agregar dominio completo:**
+   - Panel → **Networking** → **Domains**
+   - Clic **Add Domain**
+   - Ingresa: `sense.lat`
+   - Selecciona tu droplet ChirpStack
+   - Clic **Add Domain**
+
+2. **Configurar nameservers en tu registrador:**
+   - Ve al panel donde compraste `sense.lat`
+   - Cambia nameservers a:
+     - `ns1.digitalocean.com`
+     - `ns2.digitalocean.com`
+     - `ns3.digitalocean.com`
+
+3. **Agregar subdominio network:**
+   - Volver a DigitalOcean → **Domains** → `sense.lat`
+   - Clic **Add Record**
+   - **Type:** A, **Hostname:** `network`, **Directs to:** tu droplet
+
+4. **Esperar propagación:** 1-24 horas para nameservers, 5-10 minutos para registro A
 
 ## Preparación del Servidor
 
 ### 1. Conexión SSH
 
 ```bash
-ssh root@SERVER_IP
+ssh root@143.244.144.51
 ```
 
 ### 2. Actualizar el sistema
@@ -109,19 +183,32 @@ apt install -y \
     nginx
 ```
 
-## Configuración de Base de Datos
+## Instalación de ChirpStack v4
 
-ChirpStack utiliza PostgreSQL y Redis. Estos se configurarán automáticamente con Docker Compose.
-
-## Instalación de ChirpStack
-
-### 1. Clonar repositorio Docker de ChirpStack
+### 1. Descargar scripts de configuración
 
 ```bash
-cd /opt
-git clone https://github.com/chirpstack/chirpstack-docker.git
-chown -R chirpstack:chirpstack chirpstack-docker
-cd chirpstack-docker
+# Crear directorio de trabajo y descargar scripts
+mkdir -p /opt/chirpstack-setup
+cd /opt/chirpstack-setup
+git clone https://github.com/viefmoon/chirpstack_agricos.git .
+chmod +x *.sh
+
+# Ejecutar instalación automática
+./quick-install.sh
+```
+
+O si prefieres instalación manual paso a paso:
+
+```bash
+# 1. Instalar dependencias
+./install-dependencies.sh
+
+# 2. Configurar ChirpStack
+./configure-chirpstack.sh
+
+# 3. Configurar seguridad y HTTPS
+./setup-security.sh
 ```
 
 ### 2. Configurar variables de entorno
@@ -133,6 +220,18 @@ cp .env.example .env
 # Editar configuración
 nano .env
 ```
+
+> **⚠️ IMPORTANTE - Configuración de Región LoRaWAN:**
+> 
+> La región determina las **frecuencias y parámetros de radio** que usará tu red LoRaWAN. **Debe coincidir con tu ubicación geográfica y gateway**. Una configuración incorrecta impedirá que los dispositivos se conecten.
+>
+> **Regiones comunes:**
+> - **US915:** Estados Unidos, Canadá, México, Brasil
+> - **EU868:** Europa, África, Rusia
+> - **AS923:** Asia-Pacífico (Japón, Singapur, etc.)
+> - **AU915:** Australia, Nueva Zelanda
+> - **CN470:** China
+> - **IN865:** India
 
 **Contenido del archivo `.env`:**
 
@@ -147,8 +246,14 @@ REDIS_PASSWORD=
 # Cambiar por una clave secreta fuerte
 CHIRPSTACK_API_SECRET=generaste-una-clave-secreta-muy-fuerte-aqui
 
-# Región LoRaWAN (cambiar según tu ubicación)
-# EU868, US915, AS923, etc.
+# Región LoRaWAN - IMPORTANTE: Seleccionar según tu ubicación
+# Regiones disponibles:
+# - EU868 (Europa)
+# - US915 (Estados Unidos, Canadá, México) 
+# - AS923 (Asia-Pacífico)
+# - AU915 (Australia)
+# - CN470 (China)
+# - IN865 (India)
 CHIRPSTACK_REGION=US915
 
 # Interfaz web
@@ -164,7 +269,7 @@ nano docker-compose.yml
 **Modificaciones importantes:**
 
 ```yaml
-version: "3"
+version: "3.8"
 
 services:
   chirpstack:
@@ -249,11 +354,6 @@ docker-compose up -d
 docker-compose ps
 ```
 
-### 5. Importar dispositivos LoRaWAN (opcional)
-
-```bash
-make import-lorawan-devices
-```
 
 ## Configuración de Seguridad
 
@@ -337,14 +437,24 @@ certbot renew --dry-run
 # Verificar contenedores Docker
 docker-compose ps
 
-# Verificar logs
+# Verificar logs generales
 docker-compose logs chirpstack
 docker-compose logs chirpstack-gateway-bridge
+
+# IMPORTANTE: Verificar que la región esté cargada correctamente
+docker-compose logs chirpstack | grep -i region
 ```
+
+**Salida esperada para región:**
+```
+chirpstack_1  | INFO chirpstack::config: region configuration loaded, region=us915_0
+```
+
+Si no ves la región correcta, edita `/opt/chirpstack-docker/.env` y reinicia con `docker-compose restart`.
 
 ### 2. Acceso a la interfaz web
 
-1. Abrir navegador y ir a: `http://SERVER_IP:8080` o `https://your-domain.com`
+1. Abrir navegador y ir a: `http://143.244.144.51:8080` o `https://network.sense.lat`
 2. **Credenciales por defecto:**
    - Usuario: `admin`
    - Contraseña: `admin`
