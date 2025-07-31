@@ -74,20 +74,24 @@ if ! command -v docker &> /dev/null; then
     # Limpiar cualquier configuración anterior de Docker
     rm -f /etc/apt/sources.list.d/docker.list
     rm -f /etc/apt/keyrings/docker.asc
+    rm -f /etc/apt/keyrings/docker-archive-keyring.gpg
     
-    # Agregar Docker GPG key (método actualizado para Ubuntu 24.04)
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.asc
-    chmod a+r /etc/apt/keyrings/docker.asc
+    # Usar el script oficial de Docker (más confiable)
+    log "Descargando script oficial de Docker..."
+    curl -fsSL https://get.docker.com -o get-docker.sh
     
-    # Agregar repositorio Docker
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    # Verificar que se descargó correctamente
+    if [[ ! -f "get-docker.sh" ]]; then
+        error "No se pudo descargar el script de Docker"
+        exit 1
+    fi
     
-    # Limpiar caché apt y actualizar
-    apt clean
-    apt update
+    # Ejecutar script oficial de Docker
+    log "Ejecutando instalación oficial de Docker..."
+    sh get-docker.sh
     
-    # Instalar Docker
-    apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+    # Limpiar script temporal
+    rm -f get-docker.sh
     
     # Iniciar y habilitar Docker
     systemctl start docker
