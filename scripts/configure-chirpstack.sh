@@ -38,7 +38,7 @@ fi
 
 # Variables de configuración
 PUBLIC_IP="143.244.144.51"
-CHIRPSTACK_REGION="us915_0"  # Región US915 específica
+CHIRPSTACK_REGION="us915_1"  # Región US915 canales 8-15 (canal 2)
 
 log "Iniciando configuración nativa de ChirpStack..."
 log "IP Pública: $PUBLIC_IP"
@@ -62,9 +62,9 @@ server="tcp://localhost:1883"
 client_id_template="chirpstack-gateway-bridge-{{ .GatewayID }}"
 
 # US915 region configuration
-event_topic_template="us915_0/gateway/{{ .GatewayID }}/event/{{ .EventType }}"
-state_topic_template="us915_0/gateway/{{ .GatewayID }}/state/{{ .StateType }}"
-command_topic_template="us915_0/gateway/{{ .GatewayID }}/command/#"
+event_topic_template="us915_1/gateway/{{ .GatewayID }}/event/{{ .EventType }}"
+state_topic_template="us915_1/gateway/{{ .GatewayID }}/state/{{ .StateType }}"
+command_topic_template="us915_1/gateway/{{ .GatewayID }}/command/#"
 
 [integration.mqtt.auth]
 type="generic"
@@ -92,7 +92,7 @@ servers=["redis://localhost:6379"]
 
 [network]
 net_id="000000"
-enabled_regions=["us915_0"]
+enabled_regions=["us915_1"]
 
 [api]
 bind="0.0.0.0:8080"

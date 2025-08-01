@@ -55,7 +55,7 @@ chirpstack_agricos/
 - **Servidor**: Digital Ocean Droplet
 - **IP Pública**: 143.244.144.51
 - **Dominio**: network.sense.lat
-- **Región LoRaWAN**: US915 (canales 0-7)
+- **Región LoRaWAN**: US915 (canales 8-15)
 
 ### Puertos de Red
 - **8080**: Interfaz web ChirpStack
@@ -211,7 +211,7 @@ ufw status
 ## Regiones LoRaWAN Disponibles
 
 - **us915_0**: Estados Unidos, Canadá, México, Brasil (canales 0-7)
-- **us915_1**: Estados Unidos, Canadá, México, Brasil (canales 8-15)
+- **us915_1**: Estados Unidos, Canadá, México, Brasil (canales 8-15) - CONFIGURADO
 - **eu868**: Europa, África, Rusia
 - **as923**: Asia-Pacífico (Japón, Singapur, etc.)
 - **au915_0**: Australia, Nueva Zelanda (canales 0-7)
