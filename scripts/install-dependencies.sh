@@ -60,6 +60,7 @@ apt install -y \
     vim \
     ufw \
     certbot \
+    python3-certbot-nginx \
     nginx \
     unzip \
     software-properties-common \

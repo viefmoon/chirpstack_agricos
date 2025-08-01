@@ -252,6 +252,13 @@ EOF
     # Crear directorio para challenges de Let's Encrypt
     mkdir -p /var/www/html/.well-known
     
+    # Verificar que el plugin de nginx esté instalado
+    if ! dpkg -l | grep -q python3-certbot-nginx; then
+        log "Instalando plugin de certbot para nginx..."
+        apt update
+        apt install -y python3-certbot-nginx
+    fi
+    
     log "Obteniendo certificado SSL de Let's Encrypt..."
     if certbot --nginx -d $DOMAIN --non-interactive --agree-tos --email admin@$DOMAIN --redirect; then
         log "Certificado SSL configurado exitosamente"
