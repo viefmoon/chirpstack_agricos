@@ -209,20 +209,24 @@ echo ""
 
 ENV_FILE="/opt/chirpstack-supabase-service/.env"
 
+echo "Solo necesitas configurar tus credenciales de Supabase."
+echo "La configuración MQTT se establecerá automáticamente para ChirpStack local."
+echo ""
+
 echo "Configurando credenciales de Supabase..."
 read -p "URL de Supabase (ej: https://tu-proyecto.supabase.co): " SUPABASE_URL
 read -p "Service Role Key de Supabase: " SUPABASE_SERVICE_ROLE_KEY
 
+# Configuración MQTT automática para ChirpStack local
+MQTT_HOST="localhost"
+MQTT_PORT="1883"
+MQTT_TOPIC="application/#"
+
 echo ""
-echo "Configuración MQTT (por defecto usar localhost para ChirpStack local):"
-read -p "MQTT Host [localhost]: " MQTT_HOST
-MQTT_HOST=${MQTT_HOST:-localhost}
-
-read -p "MQTT Port [1883]: " MQTT_PORT
-MQTT_PORT=${MQTT_PORT:-1883}
-
-read -p "MQTT Topic [application/#]: " MQTT_TOPIC
-MQTT_TOPIC=${MQTT_TOPIC:-"application/#"}
+echo "✅ Configuración MQTT automática:"
+echo "   Host: $MQTT_HOST"
+echo "   Puerto: $MQTT_PORT"
+echo "   Tópico: $MQTT_TOPIC"
 
 # Crear archivo .env
 cat > "$ENV_FILE" << ENVEOF
@@ -230,7 +234,7 @@ cat > "$ENV_FILE" << ENVEOF
 SUPABASE_URL=$SUPABASE_URL
 SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY
 
-# Configuración MQTT (ChirpStack)
+# Configuración MQTT (ChirpStack) - Automática
 MQTT_HOST=$MQTT_HOST
 MQTT_PORT=$MQTT_PORT
 MQTT_TOPIC=$MQTT_TOPIC
