@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# ChirpStack Complete Clean Installation
-# Este script limpia completamente y reinstala ChirpStack
+# ChirpStack Complete Clean Installation (Native)
+# Este script limpia completamente la instalación nativa de ChirpStack
 
 set -e
 
@@ -38,56 +38,84 @@ echo -e "${GREEN}"
 cat << 'EOF'
  ┌─────────────────────────────────────────────────────────────┐
  │                                                             │
- │          ChirpStack Complete Clean Installation             │
+ │       ChirpStack Complete Clean Installation (Native)       │
  │                                                             │
  └─────────────────────────────────────────────────────────────┘
 EOF
 echo -e "${NC}"
 
-log "Iniciando limpieza completa..."
+log "Iniciando limpieza completa de instalación nativa..."
 
-# 1. Detener y eliminar todos los contenedores Docker
-log "Deteniendo y eliminando contenedores Docker..."
-if command -v docker-compose >/dev/null 2>&1; then
-    cd /opt/chirpstack-docker 2>/dev/null && docker-compose down -v || true
-fi
+# 1. Detener servicios ChirpStack
+log "Deteniendo servicios ChirpStack..."
+systemctl stop chirpstack 2>/dev/null || true
+systemctl stop chirpstack-gateway-bridge 2>/dev/null || true
+systemctl disable chirpstack 2>/dev/null || true
+systemctl disable chirpstack-gateway-bridge 2>/dev/null || true
 
-# Eliminar contenedores relacionados con ChirpStack
-docker ps -a | grep -E "(chirpstack|mosquitto|postgres|redis)" | awk '{print $1}' | xargs -r docker rm -f || true
+# 2. Remover paquetes ChirpStack
+log "Removiendo paquetes ChirpStack..."
+apt remove --purge -y chirpstack chirpstack-gateway-bridge 2>/dev/null || true
 
-# Eliminar volúmenes
-docker volume ls | grep -E "(chirpstack|postgres|redis)" | awk '{print $2}' | xargs -r docker volume rm || true
+# 3. Limpiar configuraciones
+log "Limpiando configuraciones..."
+rm -rf /etc/chirpstack
+rm -rf /etc/chirpstack-gateway-bridge
 
-# 2. Limpiar directorios de instalación
-log "Eliminando directorios de instalación..."
+# 4. Limpiar base de datos PostgreSQL
+log "Limpiando base de datos..."
+sudo -u postgres psql << 'EOF' 2>/dev/null || true
+DROP DATABASE IF EXISTS chirpstack;
+DROP ROLE IF EXISTS chirpstack;
+\q
+EOF
+
+# 5. Limpiar directorios de datos
+log "Limpiando directorios..."
+rm -rf /opt/chirpstack-config
 rm -rf /opt/chirpstack-docker
 rm -rf /opt/chirpstack-setup
 rm -rf /opt/chirpstack-supabase-service
 rm -rf /opt/backups/chirpstack
 
-# 3. Limpiar configuraciones de Nginx
+# 6. Limpiar scripts de utilidad
+log "Limpiando scripts..."
+rm -f /opt/chirpstack-*.sh
+rm -f /opt/CHIRPSTACK_NATIVE_INSTALL.txt
+rm -f /opt/INSTALLATION_SUMMARY.txt
+rm -f /opt/security-monitor.sh
+
+# 7. Limpiar configuraciones de Nginx
 log "Limpiando configuraciones de Nginx..."
 rm -f /etc/nginx/sites-enabled/chirpstack
 rm -f /etc/nginx/sites-available/chirpstack
 
-# 4. Limpiar servicios systemd
+# 8. Limpiar servicios systemd
 log "Limpiando servicios systemd..."
 systemctl stop chirpstack-supabase 2>/dev/null || true
 systemctl disable chirpstack-supabase 2>/dev/null || true
 rm -f /etc/systemd/system/chirpstack-supabase.service
 systemctl daemon-reload
 
-# 5. Limpiar archivos de log y temporales
-log "Limpiando archivos de log y temporales..."
-rm -f /var/log/chirpstack*.log
-rm -f /opt/INSTALLATION_SUMMARY.txt
-rm -f /opt/security-monitor.sh
+# 9. Limpiar archivos de log
+log "Limpiando archivos de log..."
+rm -rf /var/log/chirpstack/
+rm -f /var/log/nginx/chirpstack*.log
 
-# 6. Limpiar certificados SSL si existen
+# 10. Limpiar certificados SSL si existen
 log "Limpiando certificados SSL..."
 certbot delete --cert-name network.sense.lat --non-interactive 2>/dev/null || true
 
-# 7. Reiniciar servicios de red
+# 11. Limpiar repositorio ChirpStack
+log "Limpiando repositorio ChirpStack..."
+rm -f /etc/apt/sources.list.d/chirpstack.list
+rm -f /etc/apt/keyrings/chirpstack.gpg
+
+# 12. Actualizar cache de paquetes
+log "Actualizando cache de paquetes..."
+apt update
+
+# 13. Reiniciar servicios de red
 log "Reiniciando servicios de red..."
 systemctl restart nginx || true
 
@@ -98,6 +126,12 @@ echo ""
 echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
 echo -e "${GREEN}                  ¡LIMPIEZA COMPLETADA!                          ${NC}"
 echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
+echo ""
+echo -e "${YELLOW}Servicios que permanecen (necesarios para nueva instalación):${NC}"
+echo "✓ PostgreSQL - Base de datos limpia"
+echo "✓ Redis - Cache limpio"
+echo "✓ Mosquitto - Broker MQTT"
+echo "✓ Nginx - Servidor web"
 echo ""
 echo -e "${YELLOW}Próximo paso:${NC}"
 echo -e "${BLUE}sudo ./install.sh${NC}"

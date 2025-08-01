@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# ChirpStack v4 + Supabase - Instalador Principal
+# ChirpStack v4 Native Installation - Instalador Principal
 # Repositorio: https://github.com/viefmoon/chirpstack_agricos
-# Versión: 2.0
+# Versión: 2.0 (Native)
 
 set -e  # Salir si algún comando falla
 
@@ -45,14 +45,14 @@ echo -e "${GREEN}"
 cat << 'EOF'
  ┌─────────────────────────────────────────────────────────────┐
  │                                                             │
- │       ChirpStack v4 + Ubuntu 24.04 - Instalador v2.0      │
- │                    Instalación Automática                  │
+ │    ChirpStack v4 Native + Ubuntu 24.04 - Instalador v2.0  │
+ │                 Instalación Nativa Automática              │
  │                                                             │
  └─────────────────────────────────────────────────────────────┘
 EOF
 echo -e "${NC}"
 
-log "Iniciando instalación automática de ChirpStack v4..."
+log "Iniciando instalación nativa automática de ChirpStack v4..."
 
 # Información del servidor
 PUBLIC_IP="143.244.144.51"
@@ -116,7 +116,7 @@ fi
 log "PASO 2/4: Configurando ChirpStack nativo..."
 echo ""
 
-"$SCRIPTS_DIR/configure-chirpstack-native.sh"
+"$SCRIPTS_DIR/configure-chirpstack.sh"
 
 if [[ $? -ne 0 ]]; then
     error "Error en la configuración de ChirpStack"

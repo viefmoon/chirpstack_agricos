@@ -2,7 +2,7 @@
 
 ## Descripción del Proyecto
 
-**ChirpStack Agrícola v2.0** - Sistema completo de instalación automática de ChirpStack v4 en DigitalOcean con integración opcional de Supabase para aplicaciones IoT agrícolas.
+**ChirpStack Agrícola v2.0 (Native)** - Sistema completo de instalación nativa automática de ChirpStack v4 en DigitalOcean siguiendo la guía oficial, con integración opcional de Supabase para aplicaciones IoT agrícolas.
 
 ## Estructura del Proyecto
 
@@ -13,7 +13,7 @@ chirpstack_agricos/
 ├── CLAUDE.md                                # Este archivo
 ├── scripts/                                 # Scripts de instalación modular
 │   ├── install-dependencies.sh              # Instalación de dependencias del sistema
-│   ├── configure-chirpstack.sh              # Configuración de ChirpStack v4
+│   ├── configure-chirpstack.sh              # Configuración nativa de ChirpStack v4
 │   ├── setup-security.sh                    # Configuración de seguridad (HTTPS, firewall)
 │   ├── setup-supabase-service.sh            # Instalación del servicio Supabase
 │   └── backup-chirpstack.sh                 # Sistema de backup automático
@@ -92,25 +92,23 @@ sudo ./scripts/setup-security.sh
 sudo ./scripts/setup-supabase-service.sh
 ```
 
-### Gestión de Servicios ChirpStack
+### Gestión de Servicios ChirpStack (Nativo)
 ```bash
-# Iniciar servicios
-/opt/chirpstack-docker/start-chirpstack.sh
-
-# Detener servicios
-/opt/chirpstack-docker/stop-chirpstack.sh
+# Estado de todos los servicios
+/opt/chirpstack-status.sh
 
 # Ver logs en tiempo real
-/opt/chirpstack-docker/logs-chirpstack.sh
+/opt/chirpstack-logs.sh
 
-# Estado del sistema
-/opt/chirpstack-docker/status-chirpstack.sh
+# Reiniciar todos los servicios
+/opt/chirpstack-restart.sh
 
-# Comandos Docker directos
-cd /opt/chirpstack-docker
-docker-compose ps
-docker-compose logs chirpstack
-docker-compose restart
+# Comandos systemd directos
+systemctl status chirpstack
+systemctl status chirpstack-gateway-bridge
+systemctl status mosquitto
+systemctl restart chirpstack
+journalctl -u chirpstack -f
 ```
 
 ### Gestión del Servicio Supabase
@@ -160,10 +158,10 @@ ufw status
 
 ## Archivos de Configuración Importantes
 
-### ChirpStack
-- `/opt/chirpstack-docker/.env` - Variables de entorno
-- `/opt/chirpstack-docker/docker-compose.yml` - Configuración de contenedores
-- `/opt/chirpstack-docker/configuration/chirpstack/chirpstack.toml` - Configuración principal
+### ChirpStack (Nativo)
+- `/etc/chirpstack/chirpstack.toml` - Configuración principal
+- `/etc/chirpstack-gateway-bridge/chirpstack-gateway-bridge.toml` - Configuración Gateway Bridge
+- `/opt/CHIRPSTACK_NATIVE_INSTALL.txt` - Información de instalación
 
 ### Nginx
 - `/etc/nginx/sites-available/chirpstack` - Configuración del virtual host
@@ -183,7 +181,8 @@ ufw status
 - `/var/log/nginx/chirpstack.access.log` - Logs de acceso web
 - `/var/log/nginx/chirpstack.error.log` - Logs de errores web
 - `/var/log/chirpstack/security-report.log` - Reportes de seguridad
-- `docker-compose logs` - Logs de servicios Docker
+- `journalctl -u chirpstack -f` - Logs de ChirpStack en tiempo real
+- `journalctl -u chirpstack-gateway-bridge -f` - Logs de Gateway Bridge
 
 ### Backups
 - `/opt/backups/chirpstack/` - Backups automáticos
@@ -261,11 +260,14 @@ docker-compose logs chirpstack | grep -i region
 ### Problemas con servicios
 ```bash
 # Reiniciar todos los servicios
-cd /opt/chirpstack-docker
-docker-compose restart
+/opt/chirpstack-restart.sh
 
 # Ver estado detallado
-docker-compose ps
+/opt/chirpstack-status.sh
+
+# Ver logs específicos
+journalctl -u chirpstack -f
+journalctl -u chirpstack-gateway-bridge -f
 ```
 
 ## Características de Seguridad

@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# ChirpStack DigitalOcean - Script de Configuración Automática
-# Autor: Guía ChirpStack Deployment
-# Versión: 1.0
+# ChirpStack Native Installation - Script de Configuración
+# Siguiendo la guía oficial de ChirpStack
+# Versión: 2.0
 
 set -e  # Salir si algún comando falla
 
@@ -36,288 +36,106 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-# Función para generar contraseña segura
-generate_password() {
-    openssl rand -base64 32 | tr -d "=+/" | cut -c1-25
-}
-
 # Variables de configuración
-CHIRPSTACK_DIR="/opt/chirpstack-docker"
 PUBLIC_IP="143.244.144.51"
-POSTGRES_PASSWORD="chirpstack"  # Usar contraseña estándar de ChirpStack
-CHIRPSTACK_API_SECRET=$(generate_password)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CHIRPSTACK_REGION="us915_0"  # Región por defecto
+CHIRPSTACK_REGION="us915_0"  # Región US915 específica
 
-log "Iniciando configuración de ChirpStack..."
-log "IP Pública detectada: $PUBLIC_IP"
+log "Iniciando configuración nativa de ChirpStack..."
+log "IP Pública: $PUBLIC_IP"
+log "Región LoRaWAN: $CHIRPSTACK_REGION"
 
-# Crear directorio si no existe
-if [[ ! -d "$CHIRPSTACK_DIR" ]]; then
-    log "Creando directorio $CHIRPSTACK_DIR..."
-    mkdir -p "$CHIRPSTACK_DIR"
-    chown -R chirpstack:chirpstack "$CHIRPSTACK_DIR"
-fi
+# Instalar ChirpStack Gateway Bridge
+log "Instalando ChirpStack Gateway Bridge..."
+apt install -y chirpstack-gateway-bridge
 
-cd "$CHIRPSTACK_DIR"
-
-# Clonar repositorio ChirpStack Docker si no existe
-if [[ ! -f "docker-compose.yml" ]]; then
-    log "Clonando repositorio ChirpStack Docker..."
-    git clone https://github.com/chirpstack/chirpstack-docker.git temp_repo
-    mv temp_repo/* .
-    mv temp_repo/.* . 2>/dev/null || true
-    rmdir temp_repo
-    chown -R chirpstack:chirpstack .
-else
-    info "Repositorio ChirpStack ya existe, actualizando..."
-    git pull origin master || warning "No se pudo actualizar el repositorio"
-fi
-
-# Descargar archivos de configuración de regiones oficiales
-log "Descargando configuraciones de regiones oficiales..."
-mkdir -p configuration/chirpstack
-
-# Crear configuración de Mosquitto
-log "Creando configuración de Mosquitto..."
-mkdir -p configuration/mosquitto
-cat > configuration/mosquitto/mosquitto.conf << 'EOF'
-listener 1883
-allow_anonymous true
-persistence false
-log_dest stdout
-log_type error
-log_type warning
-log_type notice
-log_type information
-EOF
-
-# Crear configuración de ChirpStack Gateway Bridge
-log "Creando configuración de ChirpStack Gateway Bridge..."
-mkdir -p configuration/chirpstack-gateway-bridge
-cat > configuration/chirpstack-gateway-bridge/chirpstack-gateway-bridge.toml << 'EOF'
+# Configurar ChirpStack Gateway Bridge para US915
+log "Configurando ChirpStack Gateway Bridge para región US915..."
+cat > /etc/chirpstack-gateway-bridge/chirpstack-gateway-bridge.toml << EOF
 [general]
 log_level=4
 
+[backend.semtech_udp]
+bind="0.0.0.0:1700"
+
 [integration.mqtt]
-server="tcp://mosquitto:1883"
+server="tcp://localhost:1883"
+client_id_template="chirpstack-gateway-bridge-{{ .GatewayID }}"
 
 # US915 region configuration
 event_topic_template="us915_0/gateway/{{ .GatewayID }}/event/{{ .EventType }}"
+state_topic_template="us915_0/gateway/{{ .GatewayID }}/state/{{ .StateType }}"
 command_topic_template="us915_0/gateway/{{ .GatewayID }}/command/#"
 
-# Enable stats
+[integration.mqtt.auth]
+type="generic"
+
 [integration.mqtt.stats]
 enabled=true
 interval="30s"
 EOF
 
-# Descargar configuraciones de las regiones más comunes
-for region in us915_0 eu868 as923 au915_0; do
-    if [[ ! -f "configuration/chirpstack/region_${region}.toml" ]]; then
-        log "Descargando configuración para región $region..."
-        curl -fsSL "https://raw.githubusercontent.com/chirpstack/chirpstack/master/chirpstack/configuration/region_${region}.toml" \
-             -o "configuration/chirpstack/region_${region}.toml" || warning "No se pudo descargar región $region"
-    fi
-done
+# Instalar ChirpStack
+log "Instalando ChirpStack..."
+apt install -y chirpstack
 
-# Descargar configuración principal si no existe
-if [[ ! -f "configuration/chirpstack/chirpstack.toml" ]]; then
-    log "Descargando configuración principal..."
-    curl -fsSL "https://raw.githubusercontent.com/chirpstack/chirpstack/master/chirpstack/configuration/chirpstack.toml" \
-         -o "configuration/chirpstack/chirpstack.toml" || warning "No se pudo descargar configuración principal"
-fi
-
-# Configurar la región específica en el archivo principal
-log "Configurando región $CHIRPSTACK_REGION en chirpstack.toml..."
-if [[ -f "configuration/chirpstack/chirpstack.toml" ]]; then
-    # Crear backup del archivo original si existe
-    if [[ -f "configuration/chirpstack/chirpstack.toml" ]]; then
-        cp "configuration/chirpstack/chirpstack.toml" "configuration/chirpstack/chirpstack.toml.backup"
-    fi
-    
-    # Crear configuración completa de una sola vez (sin duplicados)
-    log "Creando configuración completa de ChirpStack..."
-    
-    # Determinar regiones habilitadas
-    if [[ "$CHIRPSTACK_REGION" == "multi" ]]; then
-        ENABLED_REGIONS='["eu868", "us915_0", "us915_1", "as923", "au915_0", "cn470_10", "in865"]'
-        info "✓ Configuración multi-región habilitada: EU868, US915, AS923, AU915, CN470, IN865"
-    else
-        ENABLED_REGIONS="[\"$CHIRPSTACK_REGION\"]"
-        info "✓ Región específica configurada: $CHIRPSTACK_REGION"
-    fi
-    
-    # Crear configuración completa y limpia
-    cat > "configuration/chirpstack/chirpstack.toml" << EOF
-# ChirpStack configuration for production deployment
-# Generated automatically by configure-chirpstack.sh
+# Configurar ChirpStack para US915
+log "Configurando ChirpStack para región US915..."
+cat > /etc/chirpstack/chirpstack.toml << EOF
+# ChirpStack configuration for native installation
+# Generated automatically by configure-chirpstack-native.sh
 
 [postgresql]
-dsn="postgres://chirpstack:chirpstack@postgres/chirpstack?sslmode=disable"
+dsn="postgres://chirpstack:chirpstack@localhost/chirpstack?sslmode=disable"
 
 [redis]
-servers=["redis://redis:6379"]
+servers=["redis://localhost:6379"]
 
 [network]
 net_id="000000"
-enabled_regions=$ENABLED_REGIONS
+enabled_regions=["us915_0"]
 
 [api]
 bind="0.0.0.0:8080"
-secret="$CHIRPSTACK_API_SECRET"
+secret="$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-25)"
 
 [gateway.backend.mqtt]
-server="tcp://mosquitto:1883"
+server="tcp://localhost:1883"
 client_id_template="chirpstack-gateway-{{ .GatewayID }}"
 
 [integration.mqtt]
-server="tcp://mosquitto:1883"
+server="tcp://localhost:1883"
 client_id_template="chirpstack-application-{{ .ApplicationID }}"
 
 [join_server]
 bind="0.0.0.0:8003"
-
 EOF
 
-    log "Configuración personalizada aplicada para región $CHIRPSTACK_REGION"
-else
-    warning "No se pudo configurar el archivo chirpstack.toml"
-fi
+# Iniciar y habilitar servicios ChirpStack
+log "Iniciando servicios ChirpStack..."
+systemctl start chirpstack-gateway-bridge
+systemctl enable chirpstack-gateway-bridge
 
-# Crear archivo de configuración .env usando la contraseña estándar
-log "Creando archivo de configuración .env..."
-cat > .env << EOF
-# PostgreSQL Configuration
-POSTGRES_PASSWORD=chirpstack
+systemctl start chirpstack
+systemctl enable chirpstack
 
-# Redis Configuration
-REDIS_PASSWORD=
+# Esperar a que los servicios estén listos
+log "Esperando a que los servicios estén listos..."
+sleep 10
 
-# ChirpStack API Secret
-CHIRPSTACK_API_SECRET=$CHIRPSTACK_API_SECRET
-
-# Región LoRaWAN - CRÍTICO: Debe coincidir con tu ubicación y gateway
-# Regiones disponibles (ID de configuración):
-# - us915_0: Estados Unidos, Canadá, México, Brasil (canales 0-7)
-# - eu868: Europa, África, Rusia
-# - as923: Asia-Pacífico (Japón, Singapur, etc.)
-# - au915_0: Australia, Nueva Zelanda (canales 0-7)
-# - cn470_10: China
-# - in865: India
-# 
-# NOTA: El ID debe coincidir exactamente con el archivo region_XXX.toml
-CHIRPSTACK_REGION=us915_0
-
-EOF
-
-# Crear configuración personalizada de Docker Compose para producción
-log "Creando configuración Docker Compose para producción..."
-cat > docker-compose.yml << 'EOF'
-# Docker Compose file for ChirpStack v4
-
-services:
-  chirpstack:
-    image: chirpstack/chirpstack:4
-    command: -c /etc/chirpstack
-    restart: unless-stopped
-    volumes:
-      - ./configuration/chirpstack:/etc/chirpstack
-      - ./lorawan-devices:/opt/lorawan-devices
-    depends_on:
-      - postgres
-      - redis
-    environment:
-      - MQTT_BROKER_HOST=mosquitto
-      - REDIS_HOST=redis
-      - POSTGRESQL_HOST=postgres
-    ports:
-      - "8080:8080"
-    networks:
-      - chirpstack
-
-  chirpstack-gateway-bridge:
-    image: chirpstack/chirpstack-gateway-bridge:4
-    restart: unless-stopped
-    ports:
-      - "1700:1700/udp"
-    volumes:
-      - ./configuration/chirpstack-gateway-bridge:/etc/chirpstack-gateway-bridge
-    networks:
-      - chirpstack
-    depends_on:
-      - mosquitto
-    healthcheck:
-      test: ["CMD", "pgrep", "chirpstack-gateway-bridge"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  mosquitto:
-    image: eclipse-mosquitto:2
-    restart: unless-stopped
-    ports:
-      - "1883:1883"
-    volumes:
-      - ./configuration/mosquitto:/mosquitto/config/
-    networks:
-      - chirpstack
-    healthcheck:
-      test: ["CMD", "mosquitto_pub", "-h", "localhost", "-t", "test", "-m", "health-check"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  postgres:
-    image: postgres:14-alpine
-    restart: unless-stopped
-    volumes:
-      - ./configuration/postgresql/initdb:/docker-entrypoint-initdb.d
-      - postgresqldata:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_PASSWORD=chirpstack
-      - POSTGRES_USER=chirpstack
-      - POSTGRES_DB=chirpstack
-    networks:
-      - chirpstack
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U chirpstack"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    command: redis-server --appendonly yes
-    volumes:
-      - redisdata:/data
-    networks:
-      - chirpstack
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-volumes:
-  postgresqldata:
-  redisdata:
-
-networks:
-  chirpstack:
-    driver: bridge
-EOF
-
-# Asegurar permisos correctos
-chown -R chirpstack:chirpstack "$CHIRPSTACK_DIR"
+# Verificar estado de los servicios
+log "Verificando estado de los servicios..."
+systemctl status chirpstack-gateway-bridge --no-pager -l || warning "Gateway Bridge no está funcionando correctamente"
+systemctl status chirpstack --no-pager -l || warning "ChirpStack no está funcionando correctamente"
+systemctl status mosquitto --no-pager -l || warning "Mosquitto no está funcionando correctamente"
+systemctl status redis-server --no-pager -l || warning "Redis no está funcionando correctamente"
+systemctl status postgresql --no-pager -l || warning "PostgreSQL no está funcionando correctamente"
 
 # Configurar Nginx como reverse proxy
 log "Configurando Nginx como reverse proxy..."
 cat > /etc/nginx/sites-available/chirpstack << EOF
 server {
     listen 80;
-    server_name network.sense.lat;
+    server_name network.sense.lat $PUBLIC_IP;
 
     # Aumentar tamaño máximo de subida
     client_max_body_size 10M;
@@ -360,151 +178,142 @@ fi
 ln -sf /etc/nginx/sites-available/chirpstack /etc/nginx/sites-enabled/
 nginx -t && systemctl reload nginx
 
-# Crear script de inicio/monitoreo
+# Crear scripts de utilidad
 log "Creando scripts de utilidad..."
-cat > /opt/chirpstack-docker/start-chirpstack.sh << 'EOF'
+cat > /opt/chirpstack-status.sh << 'EOF'
 #!/bin/bash
-cd /opt/chirpstack-docker
-docker-compose up -d
-echo "ChirpStack iniciado. Verificando servicios..."
-sleep 10
-docker-compose ps
-EOF
-
-cat > /opt/chirpstack-docker/stop-chirpstack.sh << 'EOF'
-#!/bin/bash
-cd /opt/chirpstack-docker
-docker-compose down
-echo "ChirpStack detenido."
-EOF
-
-cat > /opt/chirpstack-docker/logs-chirpstack.sh << 'EOF'
-#!/bin/bash
-cd /opt/chirpstack-docker
-docker-compose logs -f
-EOF
-
-cat > /opt/chirpstack-docker/status-chirpstack.sh << 'EOF'
-#!/bin/bash
-cd /opt/chirpstack-docker
-echo "=== Estado de contenedores ==="
-docker-compose ps
+echo "=== ChirpStack Services Status ==="
 echo ""
-echo "=== Uso de recursos ==="
-docker stats --no-stream
+echo "ChirpStack Gateway Bridge:"
+systemctl status chirpstack-gateway-bridge --no-pager -l
 echo ""
-echo "=== Puertos abiertos ==="
+echo "ChirpStack:"
+systemctl status chirpstack --no-pager -l
+echo ""
+echo "Mosquitto MQTT Broker:"
+systemctl status mosquitto --no-pager -l
+echo ""
+echo "Redis:"
+systemctl status redis-server --no-pager -l
+echo ""
+echo "PostgreSQL:"
+systemctl status postgresql --no-pager -l
+echo ""
+echo "=== Network Ports ==="
 netstat -tlnp | grep -E '(8080|1700|1883)'
 EOF
 
+cat > /opt/chirpstack-logs.sh << 'EOF'
+#!/bin/bash
+echo "=== ChirpStack Logs ==="
+echo ""
+echo "Press Ctrl+C to exit log viewing"
+echo ""
+journalctl -f -u chirpstack -u chirpstack-gateway-bridge -u mosquitto
+EOF
+
+cat > /opt/chirpstack-restart.sh << 'EOF'
+#!/bin/bash
+echo "Restarting all ChirpStack services..."
+systemctl restart mosquitto
+systemctl restart redis-server
+systemctl restart chirpstack-gateway-bridge
+systemctl restart chirpstack
+systemctl restart nginx
+echo "All services restarted."
+echo ""
+echo "Checking status..."
+systemctl status chirpstack --no-pager -l
+EOF
+
 # Hacer scripts ejecutables
-chmod +x /opt/chirpstack-docker/*.sh
-chown chirpstack:chirpstack /opt/chirpstack-docker/*.sh
-
-
-# Asegurar que no hay servicios corriendo y reiniciar limpio
-log "Reiniciando servicios ChirpStack con configuración actualizada..."
-cd "$CHIRPSTACK_DIR"
-
-# Detener cualquier servicio existente y limpiar volúmenes problemáticos
-docker-compose down -v || true
-
-# Iniciar servicios con la nueva configuración
-log "Iniciando servicios ChirpStack..."
-docker-compose up -d
-
-# Esperar a que los servicios estén listos
-log "Esperando a que los servicios estén listos..."
-sleep 30
-
-# Verificar estado de los servicios
-log "Verificando estado de los servicios..."
-su - chirpstack -c "cd $CHIRPSTACK_DIR && docker-compose ps"
-
+chmod +x /opt/chirpstack-*.sh
 
 # Crear archivo de información de la instalación
 log "Creando archivo de información de la instalación..."
-cat > /opt/chirpstack-docker/INSTALLATION_INFO.txt << EOF
-ChirpStack Installation Information
-===================================
+cat > /opt/CHIRPSTACK_NATIVE_INSTALL.txt << EOF
+ChirpStack Native Installation Information
+==========================================
 
 Installation Date: $(date)
+Installation Method: Native packages (following official guide)
 Server IP: $PUBLIC_IP
-Installation Directory: $CHIRPSTACK_DIR
+LoRaWAN Region: $CHIRPSTACK_REGION
 
-Database Configuration:
-- PostgreSQL Password: chirpstack (default)
-- ChirpStack API Secret: $CHIRPSTACK_API_SECRET
+Access Information:
+Web Interface: http://$PUBLIC_IP:8080
+Default Username: admin
+Default Password: admin
 
-Web Interface:
-- URL: http://143.244.144.51:8080
-- URL with domain: https://network.sense.lat (after DNS setup)
-- Default Username: admin
-- Default Password: admin
+IMPORTANT: Change the default password immediately!
 
-IMPORTANT: Change the default admin password immediately!
+Configuration Files:
+- ChirpStack: /etc/chirpstack/chirpstack.toml
+- Gateway Bridge: /etc/chirpstack-gateway-bridge/chirpstack-gateway-bridge.toml
+- Nginx: /etc/nginx/sites-available/chirpstack
 
 Services:
-- ChirpStack Web Interface: Port 8080
-- MQTT Broker: Port 1883  
-- Gateway Bridge: Port 1700/UDP
+- ChirpStack: systemctl status chirpstack
+- Gateway Bridge: systemctl status chirpstack-gateway-bridge
+- MQTT Broker: systemctl status mosquitto
+- Redis: systemctl status redis-server
+- PostgreSQL: systemctl status postgresql
 
 Useful Commands:
-- Start services: /opt/chirpstack-docker/start-chirpstack.sh
-- Stop services: /opt/chirpstack-docker/stop-chirpstack.sh
-- View logs: /opt/chirpstack-docker/logs-chirpstack.sh
-- Check status: /opt/chirpstack-docker/status-chirpstack.sh
+- Check status: /opt/chirpstack-status.sh
+- View logs: /opt/chirpstack-logs.sh
+- Restart services: /opt/chirpstack-restart.sh
 
-Nginx Configuration:
-- Config file: /etc/nginx/sites-available/chirpstack
-- Reverse proxy configured for port 80
+Service Logs:
+- ChirpStack: journalctl -u chirpstack -f
+- Gateway Bridge: journalctl -u chirpstack-gateway-bridge -f
+- MQTT: journalctl -u mosquitto -f
+
+Network Ports:
+- ChirpStack Web Interface: 8080
+- MQTT Broker: 1883
+- Gateway Bridge UDP: 1700
+- HTTP/HTTPS: 80/443
 
 Next Steps:
 1. Access http://$PUBLIC_IP:8080
 2. Login with admin/admin
 3. Change default password
-4. Configure your first gateway and application
+4. Configure your first gateway
+5. Set up your first application
+6. Register your first device
 
+Troubleshooting:
+- Check all services: /opt/chirpstack-status.sh
+- View live logs: /opt/chirpstack-logs.sh
+- Restart all: /opt/chirpstack-restart.sh
 EOF
 
-chown chirpstack:chirpstack /opt/chirpstack-docker/INSTALLATION_INFO.txt
-
-log "¡Configuración de ChirpStack completada exitosamente!"
+log "¡Configuración nativa de ChirpStack completada exitosamente!"
 
 echo ""
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}  CHIRPSTACK CONFIGURADO EXITOSAMENTE${NC}"
+echo -e "${GREEN}  CHIRPSTACK NATIVE INSTALADO EXITOSAMENTE${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo -e "${BLUE}Información de acceso:${NC}"
-echo -e "URL: ${YELLOW}http://143.244.144.51:8080${NC}"
-echo -e "URL con dominio: ${YELLOW}https://network.sense.lat${NC} (después de configurar DNS)"
+echo -e "URL: ${YELLOW}http://$PUBLIC_IP:8080${NC}"
 echo -e "Usuario: ${YELLOW}admin${NC}"
 echo -e "Contraseña: ${YELLOW}admin${NC}"
 echo ""
 echo -e "${RED}🚨 PASO CRÍTICO INMEDIATO:${NC}"
 echo -e "${RED}CAMBIAR CONTRASEÑA DE ADMIN (OBLIGATORIO)${NC}"
 echo ""
-echo -e "${YELLOW}Cómo cambiar contraseña:${NC}"
-echo "1. Ir a: http://143.244.144.51:8080"
-echo "2. Login: admin / admin"
-echo "3. Clic en avatar (esquina superior derecha)"
-echo "4. Ir a 'Change password'"
-echo "5. Crear contraseña segura"
-echo ""
 echo -e "${BLUE}Comandos útiles:${NC}"
-echo "- Iniciar servicios: /opt/chirpstack-docker/start-chirpstack.sh"
-echo "- Detener servicios: /opt/chirpstack-docker/stop-chirpstack.sh"
-echo "- Ver logs: /opt/chirpstack-docker/logs-chirpstack.sh"
-echo "- Ver estado: /opt/chirpstack-docker/status-chirpstack.sh"
+echo "- Estado de servicios: /opt/chirpstack-status.sh"
+echo "- Ver logs en vivo: /opt/chirpstack-logs.sh"
+echo "- Reiniciar servicios: /opt/chirpstack-restart.sh"
 echo ""
-echo -e "${BLUE}Información guardada en:${NC}"
-echo "/opt/chirpstack-docker/INSTALLATION_INFO.txt"
+echo -e "${BLUE}Información completa guardada en:${NC}"
+echo "/opt/CHIRPSTACK_NATIVE_INSTALL.txt"
 echo ""
-echo -e "${YELLOW}Siguiente paso recomendado:${NC}"  
+echo -e "${YELLOW}Siguiente paso recomendado:${NC}"
 echo "sudo ./setup-security.sh (para configurar HTTPS)"
-echo ""
-echo -e "${RED}⚠️  NO uses en producción con contraseña 'admin'${NC}"
 echo ""
 
 exit 0

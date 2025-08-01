@@ -1,8 +1,8 @@
-# Guía Completa: Despliegue de ChirpStack v4 en DigitalOcean
+# Guía Completa: Despliegue Nativo de ChirpStack v4 en DigitalOcean
 
-Esta guía te llevará paso a paso para deployar una infraestructura completa de ChirpStack v4 en un droplet de DigitalOcean desde cero.
+Esta guía te llevará paso a paso para deployar una infraestructura completa de ChirpStack v4 de forma nativa en un droplet de DigitalOcean desde cero, siguiendo la guía oficial de ChirpStack.
 
-> **Optimizado para Ubuntu 24.04 LTS:** Esta guía aprovecha las mejoras de seguridad, rendimiento y compatibilidad de Ubuntu 24.04 LTS, combinadas con ChirpStack v4 que unifica el Network Server y Application Server en un solo componente.
+> **Instalación Nativa con Ubuntu 24.04 LTS:** Esta guía sigue la documentación oficial de ChirpStack aprovechando las mejoras de seguridad, rendimiento y compatibilidad de Ubuntu 24.04 LTS, combinadas con ChirpStack v4 que unifica el Network Server y Application Server en un solo componente.
 
 ## ⚡ Instalación Rápida
 
@@ -151,31 +151,66 @@ apt update && apt upgrade -y
 timedatectl set-timezone America/Mexico_City  # Ajusta según tu ubicación
 ```
 
-### 4. Crear usuario para ChirpStack
+## Instalación de Dependencias (Nativa)
+
+### 1. Instalar requisitos de ChirpStack según guía oficial
 
 ```bash
-adduser chirpstack
-usermod -aG sudo chirpstack
+# Instalar servicios base
+apt install -y \
+    mosquitto \
+    mosquitto-clients \
+    redis-server \
+    redis-tools \
+    postgresql \
+    gpg
+
+# Iniciar y habilitar servicios
+systemctl start mosquitto
+systemctl enable mosquitto
+systemctl start redis-server  
+systemctl enable redis-server
+systemctl start postgresql
+systemctl enable postgresql
 ```
 
-## Instalación de Dependencias
-
-### 1. Instalar Docker y Docker Compose
+### 2. Configurar PostgreSQL
 
 ```bash
-# Instalar Docker
-curl -fsSL https://get.docker.com -o get-docker.sh
-sh get-docker.sh
+# Configurar base de datos
+sudo -u postgres psql << 'EOF'
+-- create role for authentication
+CREATE ROLE chirpstack WITH LOGIN PASSWORD 'chirpstack';
 
-# Agregar usuario al grupo docker
-usermod -aG docker chirpstack
+-- create database
+CREATE DATABASE chirpstack WITH OWNER chirpstack;
 
-# Instalar Docker Compose
-curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-chmod +x /usr/local/bin/docker-compose
+-- change to chirpstack database
+\c chirpstack
+
+-- create pg_trgm extension
+CREATE EXTENSION pg_trgm;
+
+-- exit psql
+\q
+EOF
 ```
 
-### 2. Instalar herramientas adicionales
+### 3. Configurar repositorio ChirpStack
+
+```bash
+# Configurar clave GPG
+sudo mkdir -p /etc/apt/keyrings/
+sudo sh -c 'wget -q -O - https://artifacts.chirpstack.io/packages/chirpstack.key | gpg --dearmor > /etc/apt/keyrings/chirpstack.gpg'
+
+# Agregar repositorio
+echo "deb [signed-by=/etc/apt/keyrings/chirpstack.gpg] https://artifacts.chirpstack.io/packages/4.x/deb stable main" | sudo tee /etc/apt/sources.list.d/chirpstack.list
+
+# Actualizar cache de paquetes
+apt update
+```
+
+### 4. Instalar herramientas adicionales
 
 ```bash
 apt install -y \
@@ -186,45 +221,116 @@ apt install -y \
     nano \
     ufw \
     certbot \
+    python3-certbot-nginx \
     nginx
 ```
 
-## Instalación de ChirpStack v4
+## Instalación Nativa de ChirpStack v4
 
-### 1. Descargar scripts de configuración
+### 1. Instalar ChirpStack Gateway Bridge
 
 ```bash
-# Crear directorio de trabajo y descargar scripts
-mkdir -p /opt/chirpstack-setup
-cd /opt/chirpstack-setup
-git clone https://github.com/viefmoon/chirpstack_agricos.git .
+# Instalar desde repositorio oficial
+apt install -y chirpstack-gateway-bridge
+```
+
+### 2. Configurar ChirpStack Gateway Bridge para US915
+
+```bash
+# Configurar para región US915
+cat > /etc/chirpstack-gateway-bridge/chirpstack-gateway-bridge.toml << EOF
+[general]
+log_level=4
+
+[backend.semtech_udp]
+bind="0.0.0.0:1700"
+
+[integration.mqtt]
+server="tcp://localhost:1883"
+client_id_template="chirpstack-gateway-bridge-{{ .GatewayID }}"
+
+# US915 region configuration
+event_topic_template="us915_0/gateway/{{ .GatewayID }}/event/{{ .EventType }}"
+state_topic_template="us915_0/gateway/{{ .GatewayID }}/state/{{ .StateType }}"
+command_topic_template="us915_0/gateway/{{ .GatewayID }}/command/#"
+
+[integration.mqtt.stats]
+enabled=true
+interval="30s"
+EOF
+```
+
+### 3. Instalar ChirpStack
+
+```bash
+# Instalar desde repositorio oficial
+apt install -y chirpstack
+```
+
+### 4. Configurar ChirpStack para US915
+
+```bash
+# Configurar para región US915
+cat > /etc/chirpstack/chirpstack.toml << EOF
+[postgresql]
+dsn="postgres://chirpstack:chirpstack@localhost/chirpstack?sslmode=disable"
+
+[redis]
+servers=["redis://localhost:6379"]
+
+[network]
+net_id="000000"
+enabled_regions=["us915_0"]
+
+[api]
+bind="0.0.0.0:8080"
+secret="$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-25)"
+
+[gateway.backend.mqtt]
+server="tcp://localhost:1883"
+client_id_template="chirpstack-gateway-{{ .GatewayID }}"
+
+[integration.mqtt]
+server="tcp://localhost:1883"
+client_id_template="chirpstack-application-{{ .ApplicationID }}"
+
+[join_server]
+bind="0.0.0.0:8003"
+EOF
+```
+
+### 5. Iniciar servicios ChirpStack
+
+```bash
+# Iniciar y habilitar servicios
+systemctl start chirpstack-gateway-bridge
+systemctl enable chirpstack-gateway-bridge
+
+systemctl start chirpstack
+systemctl enable chirpstack
+### 6. Usar scripts de instalación automática
+
+```bash
+# Descargar scripts de instalación
+git clone https://github.com/viefmoon/chirpstack_agricos.git
+cd chirpstack_agricos
 chmod +x *.sh
 
-# Ejecutar instalación automática
-./install.sh
+# Ejecutar instalación automática completa
+sudo ./install.sh
 ```
 
 O si prefieres instalación manual paso a paso:
 
 ```bash
-# 1. Instalar dependencias
-./install-dependencies.sh
+# 1. Instalar dependencias nativas
+sudo ./scripts/install-dependencies.sh
 
-# 2. Configurar ChirpStack
-./configure-chirpstack.sh
+# 2. Configurar ChirpStack nativo
+sudo ./scripts/configure-chirpstack.sh
 
 # 3. Configurar seguridad y HTTPS
-./setup-security.sh
-```
-
-### 2. Configurar variables de entorno
-
-```bash
-# Copiar archivo de configuración de ejemplo
-cp .env.example .env
-
-# Editar configuración
-nano .env
+sudo ./scripts/setup-security.sh
 ```
 
 > **⚠️ IMPORTANTE - Configuración de Región LoRaWAN:**
@@ -232,132 +338,43 @@ nano .env
 > La región determina las **frecuencias y parámetros de radio** que usará tu red LoRaWAN. **Debe coincidir con tu ubicación geográfica y gateway**. Una configuración incorrecta impedirá que los dispositivos se conecten.
 >
 > **Regiones comunes:**
-> - **US915:** Estados Unidos, Canadá, México, Brasil
+> - **US915_0:** Estados Unidos, Canadá, México, Brasil (canales 0-7)
 > - **EU868:** Europa, África, Rusia
 > - **AS923:** Asia-Pacífico (Japón, Singapur, etc.)
-> - **AU915:** Australia, Nueva Zelanda
-> - **CN470:** China
+> - **AU915_0:** Australia, Nueva Zelanda (canales 0-7)
+> - **CN470_10:** China
 > - **IN865:** India
 
-**Contenido del archivo `.env`:**
+Los scripts configuran automáticamente la región **US915_0** para Estados Unidos/México. Las configuraciones se almacenan en:
 
-```env
-# PostgreSQL
-POSTGRES_PASSWORD=chirpstack_ns
+- **ChirpStack:** `/etc/chirpstack/chirpstack.toml`
+- **Gateway Bridge:** `/etc/chirpstack-gateway-bridge/chirpstack-gateway-bridge.toml`
 
-# Redis (mantener por defecto)
-REDIS_PASSWORD=
-
-# ChirpStack
-# Cambiar por una clave secreta fuerte
-CHIRPSTACK_API_SECRET=generaste-una-clave-secreta-muy-fuerte-aqui
-
-# Región LoRaWAN - IMPORTANTE: Seleccionar según tu ubicación
-# Regiones disponibles:
-# - EU868 (Europa)
-# - US915 (Estados Unidos, Canadá, México) 
-# - AS923 (Asia-Pacífico)
-# - AU915 (Australia)
-# - CN470 (China)
-# - IN865 (India)
-CHIRPSTACK_REGION=US915
-
-# Interfaz web
-CHIRPSTACK_WEB_BIND=0.0.0.0:8080
-```
-
-### 3. Modificar docker-compose.yml para producción
+### 7. Verificar instalación nativa
 
 ```bash
-nano docker-compose.yml
+# Verificar estado de todos los servicios
+systemctl status chirpstack
+systemctl status chirpstack-gateway-bridge
+systemctl status mosquitto
+systemctl status redis-server
+systemctl status postgresql
+
+# O usar script de utilidad (si usaste instalación automática)
+/opt/chirpstack-status.sh
 ```
 
-**Modificaciones importantes:**
-
-```yaml
-version: "3.8"
-
-services:
-  chirpstack:
-    image: chirpstack/chirpstack:4
-    command: -c /etc/chirpstack
-    restart: unless-stopped
-    volumes:
-      - ./configuration/chirpstack:/etc/chirpstack
-      - ./lorawan-devices:/opt/lorawan-devices
-    depends_on:
-      - postgres
-      - redis
-    environment:
-      - MQTT_BROKER_HOST=mosquitto
-      - REDIS_HOST=redis
-      - POSTGRESQL_HOST=postgres
-    ports:
-      - 8080:8080
-    networks:
-      - chirpstack
-
-  chirpstack-gateway-bridge:
-    image: chirpstack/chirpstack-gateway-bridge:4
-    restart: unless-stopped
-    ports:
-      - 1700:1700/udp
-    volumes:
-      - ./configuration/chirpstack-gateway-bridge:/etc/chirpstack-gateway-bridge
-    networks:
-      - chirpstack
-    depends_on:
-      - mosquitto
-
-  mosquitto:
-    image: eclipse-mosquitto:2
-    restart: unless-stopped
-    ports:
-      - 1883:1883
-    volumes:
-      - ./configuration/mosquitto:/mosquitto/config/
-    networks:
-      - chirpstack
-
-  postgres:
-    image: postgres:14-alpine
-    restart: unless-stopped
-    volumes:
-      - ./configuration/postgresql/initdb:/docker-entrypoint-initdb.d
-      - postgresqldata:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_PASSWORD=chirpstack_ns
-    networks:
-      - chirpstack
-
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    volumes:
-      - redisdata:/data
-    networks:
-      - chirpstack
-
-volumes:
-  postgresqldata:
-  redisdata:
-
-networks:
-  chirpstack:
-```
-
-### 4. Iniciar servicios
+### 8. Verificar conectividad
 
 ```bash
-# Cambiar al usuario chirpstack
-su - chirpstack
-cd /opt/chirpstack-docker
+# Verificar puertos abiertos
+netstat -tlnp | grep -E '(8080|1700|1883)'
 
-# Iniciar servicios
-docker-compose up -d
+# Probar interfaz web
+curl -I http://localhost:8080
 
-# Verificar que todos los contenedores estén corriendo
-docker-compose ps
+# Ver logs en tiempo real (Ctrl+C para salir)
+journalctl -f -u chirpstack -u chirpstack-gateway-bridge
 ```
 
 
@@ -489,27 +506,34 @@ Si no ves la región correcta, edita `/opt/chirpstack-docker/.env` y reinicia co
 
 ## Mantenimiento y Troubleshooting
 
-### Comandos útiles
+### Comandos útiles (Instalación Nativa)
 
 ```bash
 # Ver logs en tiempo real
-docker-compose logs -f chirpstack
+journalctl -f -u chirpstack -u chirpstack-gateway-bridge
 
 # Reiniciar servicios
-docker-compose restart
+systemctl restart chirpstack
+systemctl restart chirpstack-gateway-bridge
+systemctl restart mosquitto
+
+# O usar script de utilidad
+/opt/chirpstack-restart.sh
 
 # Actualizar ChirpStack
-docker-compose pull
-docker-compose up -d
+apt update && apt upgrade chirpstack chirpstack-gateway-bridge
 
 # Backup de base de datos
-docker-compose exec postgres pg_dump -U chirpstack chirpstack > backup.sql
+pg_dump -U chirpstack -h localhost chirpstack > backup.sql
 
 # Verificar puertos abiertos
 netstat -tlnp | grep -E '(8080|1700|1883)'
+
+# Estado completo del sistema
+/opt/chirpstack-status.sh
 ```
 
-### Troubleshooting común
+### Troubleshooting común (Instalación Nativa)
 
 #### 1. No se puede acceder a la interfaz web
 
@@ -518,98 +542,168 @@ netstat -tlnp | grep -E '(8080|1700|1883)'
 systemctl status nginx
 
 # Verificar que ChirpStack esté corriendo
-docker-compose ps
+systemctl status chirpstack
 
 # Verificar logs
-docker-compose logs chirpstack
+journalctl -u chirpstack -n 50
+journalctl -u nginx -n 20
 ```
 
-#### 2. Gateway no se conecta
+#### 2. Gateway no se conecta 
 
 ```bash
 # Verificar logs del gateway bridge
-docker-compose logs chirpstack-gateway-bridge
+journalctl -u chirpstack-gateway-bridge -f
+
+# Verificar Mosquitto MQTT
+systemctl status mosquitto
+journalctl -u mosquitto -n 20
 
 # Verificar que el puerto UDP 1700 esté abierto
 ufw status | grep 1700
+netstat -ulnp | grep 1700
 ```
 
 #### 3. Problemas de base de datos
 
 ```bash
 # Verificar PostgreSQL
-docker-compose logs postgres
+systemctl status postgresql
+journalctl -u postgresql -n 20
 
 # Conectar directamente a la base de datos
-docker-compose exec postgres psql -U chirpstack
+sudo -u postgres psql chirpstack
+
+# Verificar conexión desde ChirpStack
+psql -U chirpstack -h localhost -d chirpstack
 ```
 
-### Monitoreo
+### Monitoreo (Instalación Nativa)
 
-#### 1. Script de monitoreo básico
+#### 1. Scripts de monitoreo incluidos
 
-Crear `/opt/monitor-chirpstack.sh`:
+Los scripts de instalación automática crean utilidades de monitoreo:
 
 ```bash
+# Estado completo de servicios
+/opt/chirpstack-status.sh
+
+# Ver logs en tiempo real
+/opt/chirpstack-logs.sh
+
+# Reiniciar todos los servicios
+/opt/chirpstack-restart.sh
+```
+
+#### 2. Monitoreo manual de servicios
+
+```bash
+# Estado de servicios críticos
+systemctl status chirpstack chirpstack-gateway-bridge mosquitto postgresql redis-server
+
+# Uso de recursos
+htop
+df -h
+free -h
+
+# Conexiones de red
+netstat -tlnp | grep -E '(8080|1700|1883)'
+ss -tlnp | grep -E '(8080|1700|1883)'
+```
+
+#### 3. Configurar monitoreo automático
+
+```bash
+# Crear script personalizado de monitoreo
+cat > /opt/monitor-chirpstack-native.sh << 'EOF'
 #!/bin/bash
-echo "=== ChirpStack Health Check ==="
+echo "=== ChirpStack Native Health Check ==="
 echo "Date: $(date)"
 echo ""
 
-echo "Docker containers:"
-docker-compose -f /opt/chirpstack-docker/docker-compose.yml ps
+echo "Service Status:"
+systemctl is-active chirpstack chirpstack-gateway-bridge mosquitto postgresql redis-server
 
 echo ""
 echo "System resources:"
-df -h /
-free -h
+df -h / | tail -1
+free -h | grep Mem
 
 echo ""
 echo "Network ports:"
 netstat -tlnp | grep -E '(8080|1700|1883)'
-```
+EOF
 
-#### 2. Configurar cron para monitoreo
+chmod +x /opt/monitor-chirpstack-native.sh
 
-```bash
+# Configurar cron para monitoreo
 crontab -e
 
 # Agregar línea para ejecutar cada 5 minutos
-*/5 * * * * /opt/monitor-chirpstack.sh >> /var/log/chirpstack-monitor.log 2>&1
+*/5 * * * * /opt/monitor-chirpstack-native.sh >> /var/log/chirpstack-monitor.log 2>&1
 ```
 
-## Scripts de Automatización
+## Scripts de Automatización (Instalación Nativa)
 
-Los siguientes scripts están incluidos en esta guía:
+Los siguientes scripts están incluidos para instalación nativa:
 
-- `install-dependencies.sh` - Instalación automática de dependencias
-- `configure-chirpstack.sh` - Configuración automática de ChirpStack
-- `setup-security.sh` - Configuración de seguridad y firewall
-- `backup-chirpstack.sh` - Script de backup automático
+### Scripts principales:
+- `install.sh` - **Instalador completo automático**
+- `complete-clean-install.sh` - Limpieza completa para reinstalación 
+
+### Scripts modulares:
+- `scripts/install-dependencies.sh` - Instalación de PostgreSQL, Redis, Mosquitto
+- `scripts/configure-chirpstack.sh` - Configuración nativa de ChirpStack v4
+- `scripts/setup-security.sh` - Configuración de seguridad y HTTPS
+- `scripts/setup-supabase-service.sh` - Servicio opcional Supabase
+
+### Scripts de utilidad (creados automáticamente):
+- `/opt/chirpstack-status.sh` - Estado de todos los servicios
+- `/opt/chirpstack-logs.sh` - Ver logs en tiempo real
+- `/opt/chirpstack-restart.sh` - Reiniciar todos los servicios
 
 ## Conclusión
 
-¡Felicidades! Has deployado exitosamente ChirpStack en DigitalOcean. Tu servidor LoRaWAN está listo para:
+¡Felicidades! Has deployado exitosamente **ChirpStack v4 nativo** en DigitalOcean siguiendo la guía oficial. Tu servidor LoRaWAN está listo para:
 
-- Registrar gateways LoRaWAN
-- Gestionar dispositivos LoRa
-- Crear aplicaciones IoT
-- Monitorear tu red LoRaWAN
+- ✅ **Gateway detectado correctamente** (sin problemas MQTT)
+- ✅ **Gestión de dispositivos LoRa** con región US915_0 
+- ✅ **Aplicaciones IoT** con integración MQTT nativa
+- ✅ **Monitoreo con systemd** (más estable que Docker)
+- ✅ **Rendimiento optimizado** (sin overhead de Docker)
 
 ### Próximos pasos recomendados:
 
-1. Configurar tu primer gateway
-2. Registrar dispositivos de prueba
-3. Configurar integraciones (HTTP, MQTT, etc.)
-4. Implementar monitoreo avanzado
-5. Configurar backups automáticos
+1. **🔒 Cambiar contraseña admin** en http://143.244.144.51:8080
+2. **🔧 Configurar HTTPS** con `sudo ./scripts/setup-security.sh`
+3. **📡 Configurar tu primer gateway** (región US915_0)
+4. **📱 Registrar dispositivos de prueba**
+5. **🔗 Configurar integraciones** (HTTP, MQTT, Supabase)
+6. **📊 Implementar monitoreo** con scripts incluidos
 
-### Recursos adiciales:
+### Comandos útiles para recordar:
+
+```bash
+# Estado completo
+/opt/chirpstack-status.sh
+
+# Ver logs 
+/opt/chirpstack-logs.sh
+
+# Reiniciar servicios
+/opt/chirpstack-restart.sh
+
+# Configurar HTTPS
+sudo ./scripts/setup-security.sh
+```
+
+### Recursos adicionales:
 
 - [Documentación oficial ChirpStack](https://www.chirpstack.io/docs/)
+- [Guía oficial de instalación nativa](https://www.chirpstack.io/docs/chirpstack/installation/debian-ubuntu/)
 - [Repositorio GitHub](https://github.com/chirpstack/chirpstack)
 - [Foro de la comunidad](https://forum.chirpstack.io/)
 
 ---
 
-**Nota:** Esta guía está diseñada para instalaciones de producción. Para desarrollo, considera usar la configuración Docker más simple.
+**✅ Instalación Nativa Completa:** Esta guía implementa la instalación nativa recomendada por ChirpStack, proporcionando mejor rendimiento, estabilidad y facilidad de mantenimiento que las alternativas con Docker.

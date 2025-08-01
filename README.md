@@ -1,8 +1,8 @@
-# ChirpStack v4 en DigitalOcean - Guía de Despliegue Automático v2.0
+# ChirpStack v4 Native en DigitalOcean - Guía de Despliegue Automático v2.0
 
-Esta es una guía completa para deployar ChirpStack v4 en un droplet de DigitalOcean desde cero, incluyendo scripts de automatización y servicio opcional de integración con Supabase.
+Esta es una guía completa para deployar ChirpStack v4 de forma nativa en un droplet de DigitalOcean desde cero, siguiendo la guía oficial de ChirpStack, incluyendo scripts de automatización y servicio opcional de integración con Supabase.
 
-> **ChirpStack v4 + Ubuntu 24.04 LTS:** Combinación optimizada que unifica el Network Server y Application Server en un solo componente, aprovechando las últimas mejoras de seguridad y rendimiento de Ubuntu 24.04.
+> **ChirpStack v4 Native + Ubuntu 24.04 LTS:** Instalación nativa siguiendo la guía oficial de ChirpStack que unifica el Network Server y Application Server en un solo componente, aprovechando las últimas mejoras de seguridad y rendimiento de Ubuntu 24.04.
 
 ## ⚡ Instalación Súper Rápida
 
@@ -17,7 +17,7 @@ chmod +x install.sh
 sudo ./install.sh
 
 # ¡Eso es todo! El script hace TODO automáticamente:
-# - Instala dependencias (Docker, Node.js, Nginx)
+# - Instala dependencias nativas (PostgreSQL, Redis, Mosquitto, Nginx)
 # - Configura ChirpStack v4 con regiones oficiales
 # - Configura HTTPS automático para network.sense.lat
 # - Configura firewall y seguridad avanzada
