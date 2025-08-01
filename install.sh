@@ -112,17 +112,11 @@ if [[ $? -ne 0 ]]; then
     exit 1
 fi
 
-# PASO 2: Configurar ChirpStack
-log "PASO 2/4: Configurando ChirpStack..."
+# PASO 2: Configurar ChirpStack (instalación nativa)
+log "PASO 2/4: Configurando ChirpStack nativo..."
 echo ""
 
-# Personalizar configuración antes de ejecutar
-if [[ -f "$SCRIPTS_DIR/configure-chirpstack.sh" ]]; then
-    # Modificar región en el script si es necesario
-    sed -i "s/CHIRPSTACK_REGION=\"us915_0\"/CHIRPSTACK_REGION=\"$LORAWAN_REGION\"/" "$SCRIPTS_DIR/configure-chirpstack.sh"
-fi
-
-"$SCRIPTS_DIR/configure-chirpstack.sh"
+"$SCRIPTS_DIR/configure-chirpstack-native.sh"
 
 if [[ $? -ne 0 ]]; then
     error "Error en la configuración de ChirpStack"
@@ -250,12 +244,12 @@ echo ""
 echo -e "${RED}⚠️  IMPORTANTE: Cambia la contraseña por defecto inmediatamente${NC}"
 echo ""
 echo -e "${BLUE}📊 Estado de Servicios:${NC}"
-cd /opt/chirpstack-docker && docker-compose ps
+/opt/chirpstack-status.sh
 echo ""
 echo -e "${BLUE}🔧 Comandos Útiles:${NC}"
-echo "   • Ver logs: ${YELLOW}/opt/chirpstack-docker/logs-chirpstack.sh${NC}"
-echo "   • Estado: ${YELLOW}/opt/chirpstack-docker/status-chirpstack.sh${NC}"
-echo "   • Backup: ${YELLOW}$SCRIPTS_DIR/backup-chirpstack.sh${NC}"
+echo "   • Ver logs: ${YELLOW}/opt/chirpstack-logs.sh${NC}"
+echo "   • Estado: ${YELLOW}/opt/chirpstack-status.sh${NC}"
+echo "   • Reiniciar: ${YELLOW}/opt/chirpstack-restart.sh${NC}"
 echo ""
 echo -e "${BLUE}📄 Resumen completo guardado en:${NC} /opt/INSTALLATION_SUMMARY.txt"
 echo ""

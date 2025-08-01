@@ -69,73 +69,60 @@ apt install -y \
     gnupg \
     lsb-release
 
-# Instalar Docker
-log "Instalando Docker..."
-if ! command -v docker &> /dev/null; then
-    # Limpiar cualquier configuración anterior de Docker
-    rm -f /etc/apt/sources.list.d/docker.list
-    rm -f /etc/apt/keyrings/docker.asc
-    rm -f /etc/apt/keyrings/docker-archive-keyring.gpg
-    
-    # Usar el script oficial de Docker (más confiable)
-    log "Descargando script oficial de Docker..."
-    curl -fsSL https://get.docker.com -o get-docker.sh
-    
-    # Verificar que se descargó correctamente
-    if [[ ! -f "get-docker.sh" ]]; then
-        error "No se pudo descargar el script de Docker"
-        exit 1
-    fi
-    
-    # Ejecutar script oficial de Docker
-    log "Ejecutando instalación oficial de Docker..."
-    sh get-docker.sh
-    
-    # Limpiar script temporal
-    rm -f get-docker.sh
-    
-    # Iniciar y habilitar Docker
-    systemctl start docker
-    systemctl enable docker
-    
-    log "Docker instalado correctamente"
-else
-    info "Docker ya está instalado"
-fi
+# Instalar requisitos de ChirpStack según guía oficial
+log "Instalando requisitos de ChirpStack..."
+apt install -y \
+    mosquitto \
+    mosquitto-clients \
+    redis-server \
+    redis-tools \
+    postgresql \
+    gpg
 
-# Instalar Docker Compose (versión standalone)
-log "Instalando Docker Compose..."
-if ! command -v docker-compose &> /dev/null; then
-    DOCKER_COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep 'tag_name' | cut -d\" -f4)
-    curl -L "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    chmod +x /usr/local/bin/docker-compose
-    
-    # Crear symlink para compatibilidad
-    ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose
-    
-    log "Docker Compose instalado correctamente (versión: ${DOCKER_COMPOSE_VERSION})"
-else
-    info "Docker Compose ya está instalado"
-fi
+# Iniciar y habilitar servicios
+log "Iniciando servicios..."
+systemctl start mosquitto
+systemctl enable mosquitto
+systemctl start redis-server  
+systemctl enable redis-server
+systemctl start postgresql
+systemctl enable postgresql
 
-# Crear usuario chirpstack si no existe
-log "Configurando usuario chirpstack..."
-if ! id "chirpstack" &>/dev/null; then
-    adduser --disabled-password --gecos "" chirpstack
-    usermod -aG sudo chirpstack
-    usermod -aG docker chirpstack
-    log "Usuario chirpstack creado y agregado a grupos sudo y docker"
-else
-    # Asegurar que el usuario esté en los grupos correctos
-    usermod -aG sudo chirpstack
-    usermod -aG docker chirpstack
-    info "Usuario chirpstack ya existe, agregado a grupos necesarios"
-fi
+# Configurar repositorio ChirpStack
+log "Configurando repositorio ChirpStack..."
+sudo mkdir -p /etc/apt/keyrings/
+sudo sh -c 'wget -q -O - https://artifacts.chirpstack.io/packages/chirpstack.key | gpg --dearmor > /etc/apt/keyrings/chirpstack.gpg'
+echo "deb [signed-by=/etc/apt/keyrings/chirpstack.gpg] https://artifacts.chirpstack.io/packages/4.x/deb stable main" | sudo tee /etc/apt/sources.list.d/chirpstack.list
 
-# Crear directorio para ChirpStack
-log "Creando directorio para ChirpStack..."
-mkdir -p /opt/chirpstack-docker
-chown -R chirpstack:chirpstack /opt
+# Actualizar cache de paquetes
+apt update
+
+# Configurar PostgreSQL para ChirpStack
+log "Configurando base de datos PostgreSQL..."
+sudo -u postgres psql << 'EOF'
+-- create role for authentication
+CREATE ROLE chirpstack WITH LOGIN PASSWORD 'chirpstack';
+
+-- create database
+CREATE DATABASE chirpstack WITH OWNER chirpstack;
+
+-- change to chirpstack database
+\c chirpstack
+
+-- create pg_trgm extension
+CREATE EXTENSION pg_trgm;
+
+-- exit psql
+\q
+EOF
+
+log "Base de datos PostgreSQL configurada correctamente"
+
+# Crear directorios necesarios
+log "Creando directorios..."
+mkdir -p /opt/chirpstack-config
+mkdir -p /var/log/chirpstack
+mkdir -p /opt/backups
 
 # Configurar firewall básico
 log "Configurando firewall UFW..."
@@ -202,9 +189,11 @@ EOF
 
 # Verificar instalación básica
 log "Verificando instalación..."
-docker --version && docker-compose --version
+mosquitto --help > /dev/null && log "✓ Mosquitto instalado"
+redis-cli --version > /dev/null && log "✓ Redis instalado"  
+sudo -u postgres psql -c "SELECT version();" > /dev/null && log "✓ PostgreSQL instalado"
 
 log "¡Instalación de dependencias completada exitosamente!"
-info "Docker, Nginx y usuario chirpstack configurados correctamente"
+info "Mosquitto, Redis, PostgreSQL y repositorio ChirpStack configurados correctamente"
 
 exit 0
