@@ -84,9 +84,9 @@ DOMAIN="network.sense.lat"
 HTTPS_ENABLED=true
 
 # Configuración de región US915 (Estados Unidos, México, Canadá)
-LORAWAN_REGION="us915_0"
+LORAWAN_REGION="us915_1"
 
-info "Configuración de región US915 (canales 0-7)"
+info "Configuración de región US915 (canales 8-15)"
 info "Ideal para Estados Unidos, México, Canadá, Brasil"
 
 # Hacer scripts ejecutables
