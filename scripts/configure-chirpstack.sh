@@ -131,10 +131,24 @@ fi
 # Configurar la región específica en el archivo principal
 log "Configurando región $CHIRPSTACK_REGION en chirpstack.toml..."
 if [[ -f "configuration/chirpstack/chirpstack.toml" ]]; then
-    # Crear backup del archivo original
-    cp "configuration/chirpstack/chirpstack.toml" "configuration/chirpstack/chirpstack.toml.backup"
+    # Crear backup del archivo original si existe
+    if [[ -f "configuration/chirpstack/chirpstack.toml" ]]; then
+        cp "configuration/chirpstack/chirpstack.toml" "configuration/chirpstack/chirpstack.toml.backup"
+    fi
     
-    # Configurar solo la región especificada como habilitada
+    # Crear configuración completa de una sola vez (sin duplicados)
+    log "Creando configuración completa de ChirpStack..."
+    
+    # Determinar regiones habilitadas
+    if [[ "$CHIRPSTACK_REGION" == "multi" ]]; then
+        ENABLED_REGIONS='["eu868", "us915_0", "us915_1", "as923", "au915_0", "cn470_10", "in865"]'
+        info "✓ Configuración multi-región habilitada: EU868, US915, AS923, AU915, CN470, IN865"
+    else
+        ENABLED_REGIONS="[\"$CHIRPSTACK_REGION\"]"
+        info "✓ Región específica configurada: $CHIRPSTACK_REGION"
+    fi
+    
+    # Crear configuración completa y limpia
     cat > "configuration/chirpstack/chirpstack.toml" << EOF
 # ChirpStack configuration for production deployment
 # Generated automatically by configure-chirpstack.sh
@@ -147,37 +161,7 @@ servers=["redis://redis:6379"]
 
 [network]
 net_id="000000"
-EOF
-
-# Configurar regiones según el parámetro
-if [[ "$CHIRPSTACK_REGION" == "multi" ]]; then
-    echo 'enabled_regions=["eu868", "us915_0", "us915_1", "as923", "au915_0", "cn470_10", "in865"]' >> "configuration/chirpstack/chirpstack.toml"
-    info "✓ Configuración multi-región habilitada: EU868, US915, AS923, AU915, CN470, IN865"
-else
-    echo "enabled_regions=[\"$CHIRPSTACK_REGION\"]" >> "configuration/chirpstack/chirpstack.toml"
-    info "✓ Región específica configurada: $CHIRPSTACK_REGION"
-fi
-
-# Configuración adicional para US915 y mejor detección de gateways
-cat >> "configuration/chirpstack/chirpstack.toml" << 'EOF'
-
-[gateway.backend.mqtt]
-server="tcp://mosquitto:1883"
-client_id_template="chirpstack-gateway-{{ .GatewayID }}"
-
-# Topics for US915 gateway communication  
-uplink_topic_template="us915_0/gateway/{{ .GatewayID }}/event/up"
-downlink_topic_template="us915_0/gateway/{{ .GatewayID }}/command/down"
-stats_topic_template="us915_0/gateway/{{ .GatewayID }}/event/stats"
-ack_topic_template="us915_0/gateway/{{ .GatewayID }}/event/ack"
-config_topic_template="us915_0/gateway/{{ .GatewayID }}/command/config"
-
-[integration.mqtt]
-server="tcp://mosquitto:1883"
-client_id_template="chirpstack-application-{{ .ApplicationID }}"
-EOF
-
-cat >> "configuration/chirpstack/chirpstack.toml" << EOF
+enabled_regions=$ENABLED_REGIONS
 
 [api]
 bind="0.0.0.0:8080"
@@ -251,11 +235,6 @@ services:
       - "8080:8080"
     networks:
       - chirpstack
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
   chirpstack-gateway-bridge:
     image: chirpstack/chirpstack-gateway-bridge:4
