@@ -267,21 +267,33 @@ EOF
         (crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet") | crontab -
         
         # Actualizar configuración con headers de seguridad mejorados
-        cat > /etc/nginx/sites-available/chirpstack << EOF
+        cat > /etc/nginx/sites-available/chirpstack << 'EOF'
+# HTTP - Redirigir a HTTPS para ambos dominios
 server {
     listen 80;
-    server_name $DOMAIN;
-    return 301 https://\$server_name\$request_uri;
+    server_name network.sense.lat 143.244.144.51;
+    
+    # Let's Encrypt challenges
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+    
+    # Redirigir todo a HTTPS
+    location / {
+        return 301 https://network.sense.lat$request_uri;
+    }
 }
 
+# HTTPS - Solo para el dominio
 server {
     listen 443 ssl http2;
-    server_name $DOMAIN;
+    server_name network.sense.lat;
 
     # SSL Configuration
-    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
-    ssl_trusted_certificate /etc/letsencrypt/live/$DOMAIN/chain.pem;
+    ssl_certificate /etc/letsencrypt/live/network.sense.lat/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/network.sense.lat/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 
     # SSL Security
     ssl_protocols TLSv1.2 TLSv1.3;

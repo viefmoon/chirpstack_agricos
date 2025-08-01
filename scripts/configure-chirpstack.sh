@@ -78,6 +78,20 @@ fi
 log "Descargando configuraciones de regiones oficiales..."
 mkdir -p configuration/chirpstack
 
+# Crear configuración de Mosquitto
+log "Creando configuración de Mosquitto..."
+mkdir -p configuration/mosquitto
+cat > configuration/mosquitto/mosquitto.conf << 'EOF'
+listener 1883
+allow_anonymous true
+persistence false
+log_dest stdout
+log_type error
+log_type warning
+log_type notice
+log_type information
+EOF
+
 # Descargar configuraciones de las regiones más comunes
 for region in us915_0 eu868 as923 au915_0; do
     if [[ ! -f "configuration/chirpstack/region_${region}.toml" ]]; then
