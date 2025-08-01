@@ -92,6 +92,26 @@ log_type notice
 log_type information
 EOF
 
+# Crear configuración de ChirpStack Gateway Bridge
+log "Creando configuración de ChirpStack Gateway Bridge..."
+mkdir -p configuration/chirpstack-gateway-bridge
+cat > configuration/chirpstack-gateway-bridge/chirpstack-gateway-bridge.toml << 'EOF'
+[general]
+log_level=4
+
+[integration.mqtt]
+server="tcp://mosquitto:1883"
+
+# US915 region configuration
+event_topic_template="us915_0/gateway/{{ .GatewayID }}/event/{{ .EventType }}"
+command_topic_template="us915_0/gateway/{{ .GatewayID }}/command/#"
+
+# Enable stats
+[integration.mqtt.stats]
+enabled=true
+interval="30s"
+EOF
+
 # Descargar configuraciones de las regiones más comunes
 for region in us915_0 eu868 as923 au915_0; do
     if [[ ! -f "configuration/chirpstack/region_${region}.toml" ]]; then
@@ -137,6 +157,25 @@ else
     echo "enabled_regions=[\"$CHIRPSTACK_REGION\"]" >> "configuration/chirpstack/chirpstack.toml"
     info "✓ Región específica configurada: $CHIRPSTACK_REGION"
 fi
+
+# Configuración adicional para US915 y mejor detección de gateways
+cat >> "configuration/chirpstack/chirpstack.toml" << 'EOF'
+
+[gateway.backend.mqtt]
+server="tcp://mosquitto:1883"
+client_id_template="chirpstack-gateway-{{ .GatewayID }}"
+
+# Topics for US915 gateway communication  
+uplink_topic_template="us915_0/gateway/{{ .GatewayID }}/event/up"
+downlink_topic_template="us915_0/gateway/{{ .GatewayID }}/command/down"
+stats_topic_template="us915_0/gateway/{{ .GatewayID }}/event/stats"
+ack_topic_template="us915_0/gateway/{{ .GatewayID }}/event/ack"
+config_topic_template="us915_0/gateway/{{ .GatewayID }}/command/config"
+
+[integration.mqtt]
+server="tcp://mosquitto:1883"
+client_id_template="chirpstack-application-{{ .ApplicationID }}"
+EOF
 
 cat >> "configuration/chirpstack/chirpstack.toml" << EOF
 

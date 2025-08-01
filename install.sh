@@ -83,11 +83,11 @@ log "Scripts encontrados correctamente"
 DOMAIN="network.sense.lat"
 HTTPS_ENABLED=true
 
-# Configuración multi-región (habilita todas las regiones)
-LORAWAN_REGION="multi"
+# Configuración de región US915 (Estados Unidos, México, Canadá)
+LORAWAN_REGION="us915_0"
 
-info "Configuración multi-región habilitada"
-info "Regiones soportadas: EU868, US915, AS923, AU915, CN470, IN865"
+info "Configuración de región US915 (canales 0-7)"
+info "Ideal para Estados Unidos, México, Canadá, Brasil"
 
 # Hacer scripts ejecutables
 chmod +x "$SCRIPTS_DIR"/*.sh
