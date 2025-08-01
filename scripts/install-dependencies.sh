@@ -124,6 +124,9 @@ mkdir -p /opt/chirpstack-config
 mkdir -p /var/log/chirpstack
 mkdir -p /opt/backups
 
+# Los servicios nativos no necesitan usuario chirpstack específico
+# Usar root/admin para logs y archivos
+
 # Configurar firewall básico
 log "Configurando firewall UFW..."
 ufw --force enable
@@ -171,9 +174,8 @@ sysctl -p
 # Crear directorio de logs
 log "Configurando sistema de logs..."
 mkdir -p /var/log/chirpstack
-chown chirpstack:chirpstack /var/log/chirpstack
 
-# Configurar logrotate para ChirpStack
+# Configurar logrotate para ChirpStack (instalación nativa)
 cat > /etc/logrotate.d/chirpstack << EOF
 /var/log/chirpstack/*.log {
     daily
@@ -183,7 +185,6 @@ cat > /etc/logrotate.d/chirpstack << EOF
     delaycompress
     copytruncate
     notifempty
-    su chirpstack chirpstack
 }
 EOF
 
