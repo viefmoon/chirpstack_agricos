@@ -222,6 +222,26 @@ const SENSOR_CONFIG = {
       },
     ],
   },
+  105: {
+    model: "MT05S",
+    types: [
+      {
+        sensor_type_id: SENSOR_TYPE_IDS.TEMPERATURA,
+        id_suffix: "_T",
+        index: 0,
+      },
+      {
+        sensor_type_id: SENSOR_TYPE_IDS.SOILH,
+        id_suffix: "_H",
+        index: 1,
+      },
+      {
+        sensor_type_id: SENSOR_TYPE_IDS.COND,
+        id_suffix: "_C",
+        index: 2,
+      },
+    ],
+  },
   110: {
     model: "ENV4",
     types: [

@@ -105,7 +105,7 @@ SUPABASE_SERVICE_ROLE_KEY=tu-service-role-key-aqui
 # Configuración MQTT (ChirpStack)
 MQTT_HOST=localhost
 MQTT_PORT=1883
-MQTT_TOPIC=application/#
+MQTT_TOPIC="application/#"
 
 # Configuración opcional
 NODE_ENV=production
@@ -237,7 +237,7 @@ SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY
 # Configuración MQTT (ChirpStack) - Automática
 MQTT_HOST=$MQTT_HOST
 MQTT_PORT=$MQTT_PORT
-MQTT_TOPIC=$MQTT_TOPIC
+MQTT_TOPIC="$MQTT_TOPIC"
 
 # Configuración opcional
 NODE_ENV=production
